@@ -37,8 +37,6 @@ public class ScheduleService {
 
         int duration = service.estimateDuration();
 
-        // A slot is only offered when BOTH calendars are free: the barber must not already be
-        // booked, and the customer must not be sitting in another chair at the same moment.
         List<Appointment> occupied = new ArrayList<>(activeAppointmentsOn(barber, date));
 
         if (customerId != null && !customerId.isBlank()) {

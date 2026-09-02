@@ -32,10 +32,6 @@ public class CatalogController {
         return catalogService.barbersOfService(id);
     }
 
-    @GetMapping("/barbers/{id}/services")
-    public List<ServiceDto> servicesOfBarber(@PathVariable String id) {
-        return catalogService.servicesOfBarber(id);
-    }
 
     @GetMapping("/extra-services")
     public List<ExtraServiceDto> extraServices() {
