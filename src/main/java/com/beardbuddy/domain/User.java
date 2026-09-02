@@ -296,11 +296,26 @@ public class User {
         return source.stream().filter(a -> a.getDate().equals(dateStr)).toList();
     }
 
+    /** True when this barber has no conflicting appointment in the given window. */
     public boolean isAvailableAt(LocalDate date, LocalTime start, LocalTime end) {
-        return performedAppointments.stream()
+        return hasNoConflict(performedAppointments, date, start, end);
+    }
+
+    /** True when this customer is not already booked elsewhere in the given window. */
+    public boolean isFreeAt(LocalDate date, LocalTime start, LocalTime end) {
+        return hasNoConflict(bookedAppointments, date, start, end);
+    }
+
+    private static boolean hasNoConflict(
+            List<Appointment> appointments,
+            LocalDate date,
+            LocalTime start,
+            LocalTime end
+    ) {
+        return appointments.stream()
                 .filter(Appointment::isActive)
-                .filter(a -> a.getDate().equals(date.toString()))
-                .noneMatch(a -> a.overlaps(start, end));
+                .filter(appointment -> appointment.getDate().equals(date.toString()))
+                .noneMatch(appointment -> appointment.overlaps(start, end));
     }
 
     public Appointment bookAppointment(String appointmentId, User barber, Service service, LocalDate date, LocalTime startTime) {
@@ -321,6 +336,9 @@ public class User {
         LocalTime endTime = startTime.plusMinutes(service.estimateDuration());
         if (!barber.isAvailableAt(date, startTime, endTime)) {
             throw new DomainRuleException("Selected barber is already booked for this time slot");
+        }
+        if (!isFreeAt(date, startTime, endTime)) {
+            throw new DomainRuleException("You already have another appointment at this time");
         }
 
         Appointment appointment = new Appointment(appointmentId, this, barber, service, date, startTime);

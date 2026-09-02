@@ -23,7 +23,7 @@ Read:
 | GET | `/api/services` | available services, each with its `barbers[]` |
 | GET | `/api/services/{id}/barbers` | barbers offering that service |
 | GET | `/api/barbers/{id}/services` | services of that barber |
-| GET | `/api/barbers/{id}/slots?serviceId=&date=` | bookable start times, sized to the service duration |
+| GET | `/api/barbers/{id}/slots?serviceId=&date=&customerId=` | bookable start times, sized to the service duration; excludes slots where the barber **or** the customer is busy |
 | GET | `/api/extra-services` | extras catalogue |
 | GET | `/api/customers/current` | the single seeded customer |
 | GET | `/api/customers/{id}/appointments` | `{upcoming, completed, cancelled}`, pre-split |
@@ -47,7 +47,7 @@ shows the message as-is.
 Enforced in the domain entities, not in controllers:
 
 - A barber must actually offer the requested service, have a schedule, and be open at that time
-- No overlapping booking for the same barber (`startA < endB && endA > startB`)
+- No overlapping booking for the same barber, **and none for the customer** — a customer cannot sit in two chairs at once (`startA < endB && endA > startB`)
 - `endTime` is derived from the service duration; a HYBRID sums its sub-services
 - `totalPrice` is derived: service price + extras, then any promo discount
 - Cancel only from a non-terminal status; complete only from `NEW`/`CONFIRMED`/`IN_PROGRESS`

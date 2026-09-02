@@ -26,9 +26,10 @@ public class ScheduleController {
     public AvailableSlotsDto slots(
             @PathVariable String barberId,
             @RequestParam String serviceId,
-            @RequestParam String date
+            @RequestParam String date,
+            @RequestParam(required = false) String customerId
     ) {
-        return scheduleService.availableSlots(barberId, serviceId, parseDate(date));
+        return scheduleService.availableSlots(barberId, serviceId, customerId, parseDate(date));
     }
 
     private static LocalDate parseDate(String value) {

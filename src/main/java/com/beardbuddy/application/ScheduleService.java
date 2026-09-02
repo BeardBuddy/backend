@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -25,7 +26,7 @@ public class ScheduleService {
     }
 
     @Transactional(readOnly = true)
-    public AvailableSlotsDto availableSlots(String barberId, String serviceId, LocalDate date) {
+    public AvailableSlotsDto availableSlots(String barberId, String serviceId, String customerId, LocalDate date) {
         User barber = userRepository.findById(barberId)
                 .orElseThrow(() -> new NotFoundException("Barber not found"));
         if (!barber.isBarber()) {
@@ -36,9 +37,15 @@ public class ScheduleService {
 
         int duration = service.estimateDuration();
 
-        List<Appointment> occupied = barber.getAppointmentsForDay(date).stream()
-                .filter(Appointment::isActive)
-                .toList();
+        // A slot is only offered when BOTH calendars are free: the barber must not already be
+        // booked, and the customer must not be sitting in another chair at the same moment.
+        List<Appointment> occupied = new ArrayList<>(activeAppointmentsOn(barber, date));
+
+        if (customerId != null && !customerId.isBlank()) {
+            User customer = userRepository.findById(customerId)
+                    .orElseThrow(() -> new NotFoundException("Customer not found"));
+            occupied.addAll(activeAppointmentsOn(customer, date));
+        }
 
         List<String> slots = barber.getSchedules().stream()
                 .filter(schedule -> schedule.matchesDate(date))
@@ -47,5 +54,11 @@ public class ScheduleService {
                 .orElseGet(List::of);
 
         return new AvailableSlotsDto(barberId, serviceId, date.toString(), duration, slots);
+    }
+
+    private static List<Appointment> activeAppointmentsOn(User user, LocalDate date) {
+        return user.getAppointmentsForDay(date).stream()
+                .filter(Appointment::isActive)
+                .toList();
     }
 }
