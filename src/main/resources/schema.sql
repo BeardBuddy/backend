@@ -1,12 +1,23 @@
--- Schema for the Java backend. Column names stay camelCase, exactly as in the Next.js app's
--- infrastructure/db/startup.sql, because the frontend deserializes GET /api/data by these keys.
+-- Schema for the Java backend. Column names are camelCase and Hibernate's physical naming
+-- strategy is set to the standard (non-snake-casing) one so @Column names are used verbatim.
 --
--- Runs on every startup (CREATE TABLE IF NOT EXISTS), mirroring how getDb() re-executed
--- startup.sql on lazy init. Hibernate's ddl-auto is 'none' — this script owns the schema, so the
--- CHECK constraints survive (Hibernate would not generate them).
+-- This script owns the schema; Hibernate's ddl-auto is 'none' so the CHECK constraints survive
+-- (Hibernate would not generate them).
 --
--- The one deliberate difference from startup.sql: barber_service.serviceId is UNIQUE, so a
--- service can only ever be offered by one barber.
+-- Every table is dropped and recreated on each startup, so a run always ends up with exactly the
+-- seed in data.sql regardless of what the previous run left behind. That makes startup idempotent
+-- and immune to a stale beardbuddy.db from an older schema.
+--
+-- Children before parents: foreign keys are enforced.
+DROP TABLE IF EXISTS review;
+DROP TABLE IF EXISTS appointment_extra;
+DROP TABLE IF EXISTS appointment;
+DROP TABLE IF EXISTS service_sub_service;
+DROP TABLE IF EXISTS barber_service;
+DROP TABLE IF EXISTS schedule;
+DROP TABLE IF EXISTS extra_service;
+DROP TABLE IF EXISTS service;
+DROP TABLE IF EXISTS user;
 
 CREATE TABLE IF NOT EXISTS user (
   id                  TEXT PRIMARY KEY,
@@ -42,16 +53,30 @@ CREATE TABLE IF NOT EXISTS service (
   description      TEXT NOT NULL,
   isAvailable      INTEGER DEFAULT 1,
   requiresStyling  INTEGER,
-  complexityLevel  TEXT CHECK(complexityLevel IN ('BEGINNER','INTERMEDIATE','EXPERT')),
-  subServiceIds    TEXT
+  complexityLevel  TEXT CHECK(complexityLevel IN ('BEGINNER','INTERMEDIATE','EXPERT'))
 );
 
+CREATE TABLE IF NOT EXISTS service_sub_service (
+  serviceId    TEXT NOT NULL REFERENCES service(id),
+  subServiceId TEXT NOT NULL REFERENCES service(id),
+  PRIMARY KEY (serviceId, subServiceId)
+);
+
+-- A service may be offered by several barbers, and a barber offers several services:
+-- a genuine many-to-many, with the pair kept unique so the same barber cannot be
+-- registered twice for the same service.
 CREATE TABLE IF NOT EXISTS barber_service (
   id                 TEXT PRIMARY KEY,
   barberId           TEXT NOT NULL REFERENCES user(id),
-  serviceId          TEXT NOT NULL UNIQUE REFERENCES service(id),
+  serviceId          TEXT NOT NULL REFERENCES service(id),
   seniority          TEXT NOT NULL CHECK(seniority IN ('SENIOR','JUNIOR')),
-  specializationType TEXT NOT NULL CHECK(specializationType IN ('HAIRCUT','BEARD'))
+  specializationType TEXT NOT NULL CHECK(specializationType IN ('HAIRCUT','BEARD')),
+  yearsOfExperience  INTEGER,
+  certificationLevel TEXT CHECK(certificationLevel IN ('BEGINNER','INTERMEDIATE','EXPERT')),
+  coursesCompleted   TEXT,
+  acquiredAt         TEXT,
+  notes              TEXT,
+  UNIQUE (barberId, serviceId)
 );
 
 CREATE TABLE IF NOT EXISTS schedule (
@@ -86,7 +111,9 @@ CREATE TABLE IF NOT EXISTS appointment (
   paymentMethod       TEXT NOT NULL DEFAULT 'CASH' CHECK(paymentMethod IN ('CARD','CASH','MOBILE')),
   totalPrice          REAL NOT NULL DEFAULT 0,
   notes               TEXT,
-  cancellationReason  TEXT
+  cancellationReason  TEXT,
+  paidAt              TEXT,
+  cancelledAt         TEXT
 );
 
 CREATE TABLE IF NOT EXISTS appointment_extra (

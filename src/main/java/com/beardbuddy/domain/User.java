@@ -1,8 +1,10 @@
 package com.beardbuddy.domain;
 
+import com.beardbuddy.domain.enums.AppointmentStatus;
 import com.beardbuddy.domain.enums.SeniorityLevel;
 import com.beardbuddy.domain.enums.SpecializationType;
 import com.beardbuddy.domain.enums.UserRole;
+import com.beardbuddy.domain.exception.DomainRuleException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
@@ -13,6 +15,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -95,6 +99,18 @@ public class User {
     @OneToMany(mappedBy = "barber", fetch = FetchType.LAZY)
     private List<BarberService> barberServices = new ArrayList<>();
 
+    @OneToMany(mappedBy = "barber", fetch = FetchType.LAZY)
+    private List<Schedule> schedules = new ArrayList<>();
+
+    @OneToMany(mappedBy = "customer", fetch = FetchType.LAZY)
+    private List<Appointment> bookedAppointments = new ArrayList<>();
+
+    @OneToMany(mappedBy = "barber", fetch = FetchType.LAZY)
+    private List<Appointment> performedAppointments = new ArrayList<>();
+
+    @OneToMany(mappedBy = "customer", fetch = FetchType.LAZY)
+    private List<Review> writtenReviews = new ArrayList<>();
+
     protected User() {
     }
 
@@ -108,6 +124,10 @@ public class User {
 
     public String getLastName() {
         return lastName;
+    }
+
+    public String getFullName() {
+        return firstName + " " + lastName;
     }
 
     public String getPhone() {
@@ -124,6 +144,14 @@ public class User {
 
     public UserRole getRole() {
         return role;
+    }
+
+    public boolean isBarber() {
+        return role == UserRole.BARBER;
+    }
+
+    public boolean isCustomer() {
+        return role == UserRole.CUSTOMER;
     }
 
     public SeniorityLevel getSeniorityLevel() {
@@ -150,12 +178,12 @@ public class User {
         return loyaltyPoints;
     }
 
-    public Boolean getManagementAccess() {
-        return managementAccess;
+    public boolean hasManagementAccess() {
+        return Boolean.TRUE.equals(managementAccess);
     }
 
-    public Boolean getCanMentor() {
-        return canMentor;
+    public boolean canMentor() {
+        return Boolean.TRUE.equals(canMentor);
     }
 
     public List<String> getCertifications() {
@@ -194,5 +222,150 @@ public class User {
         return barberServices.stream()
                 .map(BarberService::getService)
                 .toList();
+    }
+
+    public List<Schedule> getSchedules() {
+        if (isCustomer()) {
+            throw new DomainRuleException("Only barbers have schedules");
+        }
+        return schedules;
+    }
+
+    public List<Appointment> getBookedAppointments() {
+        return bookedAppointments;
+    }
+
+    public List<Appointment> getPerformedAppointments() {
+        return performedAppointments;
+    }
+
+    public List<Review> getWrittenReviews() {
+        return writtenReviews;
+    }
+
+    public List<Appointment> getUpcomingAppointments() {
+        requireCustomer("Only customers have upcoming appointments");
+        return bookedAppointments.stream().filter(Appointment::isUpcoming).toList();
+    }
+
+    public List<Appointment> getPastAppointments() {
+        requireCustomer("Only customers have past appointments");
+        return bookedAppointments.stream().filter(Appointment::isPast).toList();
+    }
+
+    public boolean providesService(Service service) {
+        return barberServices.stream()
+                .anyMatch(bs -> bs.getService().getId().equals(service.getId()));
+    }
+
+    public boolean isExpert() {
+        if (seniorityLevel != SeniorityLevel.SENIOR) {
+            return false;
+        }
+        boolean hasHaircut = barberServices.stream()
+                .anyMatch(bs -> bs.getSpecializationType() == SpecializationType.HAIRCUT);
+        boolean hasBeard = barberServices.stream()
+                .anyMatch(bs -> bs.getSpecializationType() == SpecializationType.BEARD);
+        return hasHaircut && hasBeard;
+    }
+
+    public double getAverageRating() {
+        if (!isBarber()) {
+            throw new DomainRuleException("Only barbers have ratings");
+        }
+        List<Integer> ratings = performedAppointments.stream()
+                .filter(a -> a.getStatus() == AppointmentStatus.COMPLETED)
+                .map(Appointment::getReview)
+                .filter(r -> r != null)
+                .map(Review::getRating)
+                .toList();
+        if (ratings.isEmpty()) {
+            return 0;
+        }
+        double sum = ratings.stream().mapToInt(Integer::intValue).sum();
+        return Math.round((sum / ratings.size()) * 10.0) / 10.0;
+    }
+
+    public boolean isWithinSchedule(LocalDate date, LocalTime time) {
+        return schedules.stream().anyMatch(s -> s.covers(date, time));
+    }
+
+    public List<Appointment> getAppointmentsForDay(LocalDate date) {
+        String dateStr = date.toString();
+        List<Appointment> source = isCustomer() ? bookedAppointments : performedAppointments;
+        return source.stream().filter(a -> a.getDate().equals(dateStr)).toList();
+    }
+
+    public boolean isAvailableAt(LocalDate date, LocalTime start, LocalTime end) {
+        return performedAppointments.stream()
+                .filter(Appointment::isActive)
+                .filter(a -> a.getDate().equals(date.toString()))
+                .noneMatch(a -> a.overlaps(start, end));
+    }
+
+    public Appointment bookAppointment(String appointmentId, User barber, Service service, LocalDate date, LocalTime startTime) {
+        requireCustomer("Only customers can book appointments");
+        if (!barber.isBarber()) {
+            throw new DomainRuleException("Executor must be a barber");
+        }
+        if (!barber.providesService(service)) {
+            throw new DomainRuleException("Selected barber does not provide this service");
+        }
+        if (barber.schedules.isEmpty()) {
+            throw new DomainRuleException("Selected barber has no schedule configured");
+        }
+        if (!barber.isWithinSchedule(date, startTime)) {
+            throw new DomainRuleException("Selected time is outside the barber's working hours");
+        }
+
+        LocalTime endTime = startTime.plusMinutes(service.estimateDuration());
+        if (!barber.isAvailableAt(date, startTime, endTime)) {
+            throw new DomainRuleException("Selected barber is already booked for this time slot");
+        }
+
+        Appointment appointment = new Appointment(appointmentId, this, barber, service, date, startTime);
+        bookedAppointments.add(appointment);
+        barber.performedAppointments.add(appointment);
+        return appointment;
+    }
+
+    public void confirmAppointment(Appointment appointment) {
+        if (!isBarber()) {
+            throw new DomainRuleException("Only barbers can approve appointments");
+        }
+        appointment.confirm();
+    }
+
+    public void cancelAppointment(Appointment appointment, String reason) {
+        requireCustomer("Only customers can cancel appointments");
+        requireOwnership(appointment);
+        appointment.cancel(reason);
+    }
+
+    public void completeOwnAppointment(Appointment appointment) {
+        requireCustomer("Only customers can complete their appointments");
+        requireOwnership(appointment);
+        appointment.complete();
+    }
+
+    public Review submitReview(Appointment appointment, int rating, String comment, LocalDate date) {
+        if (isBarber()) {
+            throw new DomainRuleException("Barbers cannot write reviews");
+        }
+        requireCustomer("Only customers can submit reviews");
+        requireOwnership(appointment);
+        return appointment.addReview(rating, comment, date);
+    }
+
+    private void requireCustomer(String message) {
+        if (!isCustomer()) {
+            throw new DomainRuleException(message);
+        }
+    }
+
+    private void requireOwnership(Appointment appointment) {
+        if (!appointment.getCustomer().getId().equals(id)) {
+            throw new DomainRuleException("Appointment does not belong to this customer");
+        }
     }
 }

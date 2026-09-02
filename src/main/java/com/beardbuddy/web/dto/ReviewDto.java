@@ -11,14 +11,14 @@ public record ReviewDto(
         String date
 ) {
 
-    public static ReviewDto from(Review r) {
+    public static ReviewDto from(Review review) {
         return new ReviewDto(
-                r.getId(),
-                r.getAppointmentId(),
-                r.getCustomerId(),
-                r.getRating(),
-                r.getComment(),
-                r.getDate()
+                review.getId(),
+                review.getAppointment().getId(),
+                review.getCustomer().getId(),
+                review.getRating(),
+                review.getComment(),
+                review.getDate()
         );
     }
 }

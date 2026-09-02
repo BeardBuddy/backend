@@ -1,10 +1,7 @@
 package com.beardbuddy.web.dto;
 
 import com.beardbuddy.domain.Service;
-import com.beardbuddy.domain.enums.CertificationLevel;
-import com.beardbuddy.domain.enums.ServiceType;
 import com.beardbuddy.web.json.CompactDoubleSerializer;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import java.util.List;
@@ -13,27 +10,27 @@ public record ServiceDto(
         String id,
         String name,
         @JsonSerialize(using = CompactDoubleSerializer.class) Double price,
-        ServiceType type,
+        String type,
         Integer duration,
         String description,
-        @JsonProperty("isAvailable") boolean isAvailable,
-        Boolean requiresStyling,
-        CertificationLevel complexityLevel,
-        List<String> subServiceIds
+        boolean available,
+        String complexityLevel,
+        List<String> subServiceIds,
+        List<BarberDto> barbers
 ) {
 
-    public static ServiceDto from(Service s) {
+    public static ServiceDto from(Service service) {
         return new ServiceDto(
-                s.getId(),
-                s.getName(),
-                s.getPrice(),
-                s.getType(),
-                s.getDuration(),
-                s.getDescription(),
-                Boolean.TRUE.equals(s.getIsAvailable()),
-                s.getRequiresStyling(),
-                s.getComplexityLevel(),
-                s.getSubServiceIds()
+                service.getId(),
+                service.getName(),
+                service.getPrice(),
+                service.getType().name(),
+                service.estimateDuration(),
+                service.getDescription(),
+                service.isAvailable(),
+                service.getComplexityLevel() == null ? null : service.getComplexityLevel().name(),
+                service.getSubServiceIds(),
+                service.getBarbers().stream().map(BarberDto::from).toList()
         );
     }
 }

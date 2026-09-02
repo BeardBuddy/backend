@@ -3,12 +3,14 @@ package com.beardbuddy.domain;
 import com.beardbuddy.domain.enums.CertificationLevel;
 import com.beardbuddy.domain.enums.ServiceType;
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
@@ -49,9 +51,13 @@ public class Service {
     @Column(name = "complexityLevel")
     private CertificationLevel complexityLevel;
 
-    @Convert(converter = StringListJsonConverter.class)
-    @Column(name = "subServiceIds")
-    private List<String> subServiceIds;
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "service_sub_service",
+            joinColumns = @JoinColumn(name = "serviceId"),
+            inverseJoinColumns = @JoinColumn(name = "subServiceId")
+    )
+    private List<Service> subServices = new ArrayList<>();
 
     @OneToMany(mappedBy = "service", fetch = FetchType.LAZY)
     private List<BarberService> barberServices = new ArrayList<>();
@@ -83,8 +89,8 @@ public class Service {
         return description;
     }
 
-    public Boolean getIsAvailable() {
-        return isAvailable;
+    public boolean isAvailable() {
+        return Boolean.TRUE.equals(isAvailable);
     }
 
     public Boolean getRequiresStyling() {
@@ -95,8 +101,12 @@ public class Service {
         return complexityLevel;
     }
 
+    public List<Service> getSubServices() {
+        return subServices;
+    }
+
     public List<String> getSubServiceIds() {
-        return subServiceIds == null ? List.of() : subServiceIds;
+        return subServices.stream().map(Service::getId).toList();
     }
 
     public List<BarberService> getBarberServices() {
@@ -107,5 +117,41 @@ public class Service {
         return barberServices.stream()
                 .map(BarberService::getBarber)
                 .toList();
+    }
+
+    public boolean isHaircut() {
+        return type == ServiceType.HAIRCUT || includesType(ServiceType.HAIRCUT);
+    }
+
+    public boolean isBeard() {
+        return type == ServiceType.BEARD || includesType(ServiceType.BEARD);
+    }
+
+    private boolean includesType(ServiceType wanted) {
+        return type == ServiceType.HYBRID && subServices.stream().anyMatch(s -> s.getType() == wanted);
+    }
+
+    public List<ServiceType> getServiceTypes() {
+        if (type != ServiceType.HYBRID) {
+            return List.of(type);
+        }
+        return subServices.stream().map(Service::getType).distinct().toList();
+    }
+
+    public boolean requiresStyling() {
+        return Boolean.TRUE.equals(requiresStyling);
+    }
+
+    public boolean includesTrim() {
+        return isBeard();
+    }
+
+    public int estimateDuration() {
+        if (type == ServiceType.HYBRID && !subServices.isEmpty()) {
+            return subServices.stream()
+                    .mapToInt(Service::getDuration)
+                    .sum();
+        }
+        return duration;
     }
 }

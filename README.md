@@ -1,8 +1,8 @@
 # BeardBuddy — Java backend
 
-Java 17 + Spring Boot 3 + Hibernate/Spring Data JPA replacement for the Next.js API routes in
-`../masproject/app/api/**`. Same paths, same verbs, same JSON in and out — the frontend does not
-know the difference beyond which host it calls.
+Java 17 + Spring Boot 3 + Hibernate/Spring Data JPA. This is the whole application model: entities,
+associations, constraints and all business rules. The frontend is a view layer — it receives flat
+DTOs and renders them.
 
 ## Run
 
@@ -10,106 +10,108 @@ know the difference beyond which host it calls.
 mvn spring-boot:run          # http://localhost:8080
 ```
 
-The SQLite file `beardbuddy.db` is created in the working directory on first start; schema and
-seed data are (re-)applied on every start and are idempotent. Point it elsewhere with
-`BEARDBUDDY_DB=/path/to/file.db`.
-
-## Point the frontend at it
-
-```bash
-cd ../masproject
-echo 'NEXT_PUBLIC_API_BASE_URL=http://localhost:8080' > .env.local
-npm run dev
-```
-
-`lib/apiBase.ts` prefixes every `fetch()` with that value. Unset, it stays empty and the app keeps
-using the Next.js routes, so both backends remain runnable side by side.
+Schema and seed are recreated on every start, so a run always ends up with exactly the dataset
+below regardless of what the previous run left behind. No cleanup step; deleting `beardbuddy.db` is
+optional. Point it elsewhere with `BEARDBUDDY_DB=/path/to/file.db`.
 
 ## Endpoints
 
-Migrated as-is from the Next.js routes:
+Read:
 
-| Method | Path | Body | Response |
-| --- | --- | --- | --- |
-| GET | `/api/data` | — | the whole dataset (`users`, `services`, `barberServices`, `schedules`, `appointments`, `extraServices`, `reviews`, `appointmentExtras`) |
-| POST | `/api/appointments` | appointment + `extraServiceIds[]` | `{"ok": true}` |
-| PATCH | `/api/appointments/{id}/cancel` | `{"cancellationReason"?}` | `{"ok": true}` |
-| PATCH | `/api/appointments/{id}/status` | `{"status"}` | `{"ok": true}` |
-| POST | `/api/reviews` | review | `{"ok": true}` |
-
-Added for the association requirement (MAS 4.2.4):
-
-| Method | Path | Response |
+| Method | Path | Returns |
 | --- | --- | --- |
-| GET | `/api/barbers/{id}/services` | services of that barber; 404 if unknown or not a barber |
-| GET | `/api/services` | every service with its `barbers` nested |
+| GET | `/api/services` | available services, each with its `barbers[]` |
+| GET | `/api/services/{id}/barbers` | barbers offering that service |
+| GET | `/api/barbers/{id}/services` | services of that barber |
+| GET | `/api/barbers/{id}/slots?serviceId=&date=` | bookable start times, sized to the service duration |
+| GET | `/api/extra-services` | extras catalogue |
+| GET | `/api/customers/current` | the single seeded customer |
+| GET | `/api/customers/{id}/appointments` | `{upcoming, completed, cancelled}`, pre-split |
+| GET | `/api/appointments/{id}` | one appointment |
 
-Failures answer `500` with the same message strings the old routes used
-(`Failed to load data`, `Failed to create appointment`, `Failed to cancel appointment`,
-`Failed to update status`, `Failed to save review`).
+Write:
 
-## Behaviour that is deliberately preserved
+| Method | Path | Body |
+| --- | --- | --- |
+| POST | `/api/appointments` | `{customerId, barberId, serviceId, date, startTime, extraServiceIds?, promoCode?, notes?}` |
+| PATCH | `/api/appointments/{id}/cancel` | `{customerId, cancellationReason?}` |
+| PATCH | `/api/appointments/{id}/complete` | `{customerId}` |
+| POST | `/api/appointments/{id}/review` | `{customerId, rating, comment?}` |
+| POST | `/api/promo-codes/apply` | `{code, total}` |
 
-The old backend was intentionally thin, and this one matches it:
+A broken rule returns `400 {"error": "<message>"}`; a missing entity returns `404`. The frontend
+shows the message as-is.
 
-- **No server-side business validation.** Double-booking checks, schedule checks, status-transition
-  rules, price computation and review eligibility all run in the browser
-  (`business-objects/*.ts`, `use-cases/*.ts`) before the request is sent. A direct API call can
-  still create a double-booked appointment — that was true before and stays true.
-- **The only server-side guards are schema constraints**: the `CHECK` enumerations,
-  `rating BETWEEN 1 AND 5`, the `UNIQUE` on `review.appointmentId`, and the foreign keys
-  (`PRAGMA foreign_keys = ON` per connection).
-- **Client-generated ids.** Appointments arrive as `appt-<epoch>` and reviews as
-  `rev-<appointmentId>`; there is no `@GeneratedValue`. `EntityManager.persist` is used rather
-  than `save()` so a duplicate id fails like the original `INSERT` instead of silently updating.
-- **Wire formats.** Dates stay `"YYYY-MM-DD"` and times `"HH:mm"` plain strings;
-  `certifications` / `beardCareKnowledge` / `subServiceIds` are JSON arrays in the response even
-  though they are JSON-encoded strings in the column; `schedule.isActive` stays the raw 0/1
-  integer the old route passed through; whole-numbered `REAL` prices serialise as `35`, not `35.0`
-  (`CompactDoubleSerializer`), because the UI renders them verbatim.
-- **`POST /api/appointments` is transactional** — appointment plus extra links commit or roll back
-  together, like the route's manual `BEGIN`/`COMMIT`/`ROLLBACK`.
+## Business rules (all server-side)
 
-## Association navigation (MAS 4.2.4)
+Enforced in the domain entities, not in controllers:
 
-`User` stays one entity with a `role` discriminator; the association that matters is
-`User`(BARBER) ↔ `Service` through the `BarberService` join entity, mapped in both directions:
+- A barber must actually offer the requested service, have a schedule, and be open at that time
+- No overlapping booking for the same barber (`startA < endB && endA > startB`)
+- `endTime` is derived from the service duration; a HYBRID sums its sub-services
+- `totalPrice` is derived: service price + extras, then any promo discount
+- Cancel only from a non-terminal status; complete only from `NEW`/`CONFIRMED`/`IN_PROGRESS`
+- Review only on a `COMPLETED` appointment, once, rating 1–5
+- Customers have no schedule; barbers cannot write reviews
+- Promo codes validated against status and expiry
 
-```java
-barber.getServices()   // User.barberServices -> BarberService.service
-service.getBarbers()   // Service.barberServices -> BarberService.barber
-```
+Ids are still generated server-side as `appt-<epoch>` / `rev-<appointmentId>`.
 
-Both new endpoints reach related objects only that way. Repositories are bare `JpaRepository`
-declarations — no `@Query`, no JPQL/HQL/SQL, no derived finders such as `findByBarberId`, no
-Criteria or Specification filtering. The only repository calls are `findById` (a primary-key
-lookup) and `findAll` (no predicate).
+## Model
 
-`barber_service.serviceId` is `UNIQUE`, so a service belongs to exactly one barber, and the seed
-data has no duplicate service ids. `Service.getBarbers()` therefore resolves to at most one barber
-today — the association is still declared collection-typed on purpose, which is what the
-requirement's "target multiplicity: many" refers to.
+Real Hibernate associations throughout:
+
+- `User` ↔ `Service` through the `BarberService` join entity, both directions mapped
+- `User` → `Appointment` twice (`customer` / `barber`), `User` → `Schedule`, `User` → `Review`
+- `Appointment` → `Service`, `Appointment` → `Review` (1:0..1)
+- `Appointment` ↔ `ExtraService` as a `@ManyToMany` over the `appointment_extra` join table
+- **Composition** `Service ◆ Service` — sub-services via the `service_sub_service` join table
+  (previously a JSON string blob)
+
+`User` stays one entity with a `role` discriminator, and `Service` one entity with a `type` enum,
+both by earlier decision.
+
+`barber_service` is a true many-to-many: a service may be offered by several barbers and a barber
+offers several services. `UNIQUE (barberId, serviceId)` only stops the same pair being registered
+twice.
 
 ## Seed data
 
-`src/main/resources/data.sql` reproduces `../masproject/infrastructure/db/startup.sql` verbatim —
-same ids, same values — with one intentional change: the `barber_service` rows were reallocated so
-no service is offered by two barbers.
+Anchored on **2026-08-02**. Five services, most shared by several barbers:
 
-| Service | Barber |
+| Service | Type | Price | Duration | Barbers |
+| --- | --- | --- | --- | --- |
+| Classic Scissor Cut | HAIRCUT | 35 | 30 | Marcus, Elena, Leo |
+| High-Skin Fade | HAIRCUT | 40 | 45 | Elena, Leo |
+| Classic Beard Trim & Shape | BEARD | 25 | 30 | Marcus, Viktor |
+| Signature Cut & Beard Combo | HYBRID | 55 | 60 (derived) | Elena |
+| Hot Towel Royal Shave | BEARD | 45 | 45 | *none* — makes flow 4A reachable |
+
+Every barber works MON–FRI but on a **different shift**, which is what makes the free slots change
+when you pick a different barber for the same service and date:
+
+| Barber | Shift |
 | --- | --- |
-| Classic Scissor Cut (HAIRCUT) | Marcus Vance — `HAIRCUT` |
-| Hot Towel Royal Shave (BEARD) | Marcus Vance — `BEARD` |
-| High-Skin Fade (HAIRCUT) | Elena Rostova — `HAIRCUT` |
-| Signature Cut & Beard Combo (HYBRID) | Elena Rostova — row tagged `BEARD` |
-| Buzz Cut & Styling (HAIRCUT) | Leo Sterling — `HAIRCUT` |
-| Classic Beard Trim & Shape (BEARD) | Viktor Kael — `BEARD` |
+| Marcus Vance (SENIOR) | 09:00–13:00 |
+| Elena Rostova (SENIOR) | 12:00–18:00 |
+| Leo Sterling (JUNIOR) | 09:00–17:00 |
+| Viktor Kael (JUNIOR) | 15:00–20:00 |
 
-Both seniors keep one `HAIRCUT` and one `BEARD` row, so they still read as hybrid-qualified;
-each junior keeps a single specialization. The existing seeded appointments still reference the
-old pairings (e.g. Leo with a Classic Scissor Cut) — that is historical data and violates no
-constraint, but it does mean the README's old manual-QA walkthroughs in `../masproject` no longer
-resolve the same way.
+Appointments (each with a barber who offers that service, at a time inside that barber's shift):
 
-`../masproject/infrastructure/db/startup.sql` is left untouched, so the Next.js app keeps its
-original dataset.
+| Date | Barber | Service | Status | Note |
+| --- | --- | --- | --- | --- |
+| 2026-07-27 | Marcus | Classic Scissor Cut | COMPLETED | reviewed ★5; **AAAA promo applied** — 35 + 15 scotch = 50, −20% = **40** |
+| 2026-07-29 | Leo | High-Skin Fade | COMPLETED | reviewed ★4 (different barber + service) |
+| 2026-07-30 | Viktor | Classic Beard Trim & Shape | COMPLETED | **no review** — reviewable in the UI |
+| 2026-07-28 | Elena | High-Skin Fade | CANCELLED | |
+| 2026-08-03 | Marcus | Classic Beard Trim & Shape | CONFIRMED | + cigar extra; blocks his 09:00 |
+| 2026-08-03 | Elena | Classic Scissor Cut | CONFIRMED | same day, blocks her 12:00 |
+| 2026-08-05 | Leo | Classic Scissor Cut | NEW | |
+
+The two bookings on 2026-08-03 are deliberate: pick *Classic Scissor Cut* on that Monday and switch
+between barbers to see three different slot sets — Marcus 09:30–12:30 (09:00 taken), Elena
+12:30–17:30 (12:00 taken), Leo the full 09:00–16:30.
+
+Promo codes are **fixtures in `PromoCode.java`**, not a database table: `AAAA` 20% active,
+`BBBB` limit reached, `CCCC` expired. Anything else is rejected with "Code cannot be applied".
