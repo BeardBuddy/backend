@@ -1,9 +1,10 @@
--- Seed data, copied verbatim from the Next.js app's infrastructure/db/startup.sql so the frontend
--- sees an identical dataset — same ids, same values. INSERT OR IGNORE keeps it idempotent across
--- restarts, matching the old getDb() behaviour of re-running the whole script.
+-- Seed data. INSERT OR IGNORE keeps it idempotent; schema.sql drops and recreates every table on
+-- startup, so a run always ends up with exactly this dataset.
 --
--- The ONE intentional deviation is the barber_service block: serviceId is now unique, so the
--- Marcus/Elena overlap is gone. See the comment above that block.
+-- Key rule: each service has its OWN barbers — no barber is shared between two services.
+--   Classic Scissor Cut        -> Marcus + Elena
+--   Classic Beard Trim & Shape -> Leo + Viktor
+--   Hot Towel Royal Shave      -> nobody (alternative flow 4A)
 
 -- ───────────────────────────────────────────────
 -- Customer
@@ -36,13 +37,13 @@ VALUES (
   0, 1, 1, 1, 1, 1, '["Beard Grooming","Razor Detailing"]'
 );
 
--- Junior Haircut Specialist — constraint: one specialization only
-INSERT OR IGNORE INTO user (id, firstName, lastName, phone, dateOfBirth, role, seniorityLevel, specializationType, experienceYears, hireDate, description, certifications, maxClientsPerDay, scissorsMastery, supportsLongHair)
+-- Junior Beard Specialist — constraint: one specialization only
+INSERT OR IGNORE INTO user (id, firstName, lastName, phone, dateOfBirth, role, seniorityLevel, specializationType, experienceYears, hireDate, description, certifications, maxClientsPerDay, trimMastery, supportsHotTowel, beardCareKnowledge)
 VALUES (
   'd1b2c3d4-0004-0000-0000-000000000004',
-  'Leo', 'Sterling', '+48777888997', '2001-03-24', 'BARBER', 'JUNIOR', 'HAIRCUT', 2, '2025-02-01',
-  'Junior Haircut Specialist with outstanding skill in high-contrast fades and modern hair styling.',
-  '["Advanced Fade Masterclass","Clipper & Scissor Fundamentals"]', 8, 0, 0
+  'Leo', 'Sterling', '+48777888997', '2001-03-24', 'BARBER', 'JUNIOR', 'BEARD', 2, '2025-02-01',
+  'Junior Beard Specialist with a precise hand for line-ups, tapers, and everyday beard upkeep.',
+  '["Beard Sculpting Essentials","Clipper & Razor Fundamentals"]', 8, 1, 0, '["Beard Oils","Line-up Technique"]'
 );
 
 -- Junior Beard Specialist — constraint: one specialization only
@@ -57,41 +58,28 @@ VALUES (
 -- ───────────────────────────────────────────────
 -- Services
 -- ───────────────────────────────────────────────
--- Four services. The HYBRID bundles two of the others through service_sub_service, so its
--- duration (60) is derived, not stored.
+-- Three services: two staffed by their own disjoint pair of barbers, one deliberately unstaffed.
 INSERT OR IGNORE INTO service (id, name, price, type, duration, description, isAvailable, requiresStyling, complexityLevel) VALUES ('f1000000-0001-0000-0000-000000000001', 'Classic Scissor Cut',        35, 'HAIRCUT', 30, 'Traditional scissor haircut tailored to your head shape. Includes shampoo, neck shave, and premium styling product.', 1, 1, NULL);
-INSERT OR IGNORE INTO service (id, name, price, type, duration, description, isAvailable, requiresStyling, complexityLevel) VALUES ('f1000000-0002-0000-0000-000000000002', 'High-Skin Fade',             40, 'HAIRCUT', 45, 'Precision clipper fade down to the skin. Completed with razor neck cleanup, wash, and style.',                       1, 1, NULL);
 INSERT OR IGNORE INTO service (id, name, price, type, duration, description, isAvailable, requiresStyling, complexityLevel) VALUES ('f1000000-0004-0000-0000-000000000004', 'Classic Beard Trim & Shape', 25, 'BEARD',   30, 'Beard trim with clippers, lined up with a trimmer. Finished with nourishing beard oil.',                             1, NULL, 'BEGINNER');
-INSERT OR IGNORE INTO service (id, name, price, type, duration, description, isAvailable, requiresStyling, complexityLevel) VALUES ('f1000000-0006-0000-0000-000000000006', 'Signature Cut & Beard Combo',55, 'HYBRID',  60, 'Our premium hybrid package consisting of a Classic Scissor Cut combined with the Classic Beard Trim.',               1, NULL, NULL);
 -- Deliberately has no barber_service row, so alternative flow 4A ("No barbers available for
 -- this service.") is reachable in the GUI.
 INSERT OR IGNORE INTO service (id, name, price, type, duration, description, isAvailable, requiresStyling, complexityLevel) VALUES ('f1000000-0007-0000-0000-000000000007', 'Hot Towel Royal Shave',      45, 'BEARD',   45, 'Traditional straight-razor shave with hot towel compression, pre-shave oil, and post-shave balm. Currently between specialists.', 1, NULL, 'EXPERT');
 
-INSERT OR IGNORE INTO service_sub_service (serviceId, subServiceId) VALUES ('f1000000-0006-0000-0000-000000000006', 'f1000000-0001-0000-0000-000000000001');
-INSERT OR IGNORE INTO service_sub_service (serviceId, subServiceId) VALUES ('f1000000-0006-0000-0000-000000000006', 'f1000000-0004-0000-0000-000000000004');
-
-
 -- ───────────────────────────────────────────────
--- BarberService associations — several barbers per service
+-- BarberService associations — each service has its OWN barbers
 -- ───────────────────────────────────────────────
--- Classic Scissor Cut         → Marcus, Elena, Leo   (3 barbers)
--- High-Skin Fade              → Elena, Leo           (2 barbers)
--- Classic Beard Trim & Shape  → Marcus, Viktor       (2 barbers)
--- Signature Cut & Beard Combo → Marcus               (1 barber — the single-barber case)
+-- No barber is shared between services: every barber appears in exactly one service's list.
 --
--- Marcus and Elena each hold a HAIRCUT and a BEARD row, so both stay hybrid-qualified
--- (isExpert()); Leo stays HAIRCUT-only and Viktor BEARD-only.
+--   Classic Scissor Cut (HAIRCUT)         → Marcus + Elena   (the two SENIORs)
+--   Classic Beard Trim & Shape (BEARD)    → Leo + Viktor     (the two JUNIORs)
+--   Hot Towel Royal Shave (BEARD)         → nobody           (alternative flow 4A)
+--
+-- Marcus and Elena are the HAIRCUT pair; Leo and Viktor the BEARD pair.
 INSERT OR IGNORE INTO barber_service (id, barberId, serviceId, seniority, specializationType) VALUES ('aa000000-0001-0000-0000-000000000001', 'b1b2c3d4-0002-0000-0000-000000000002', 'f1000000-0001-0000-0000-000000000001', 'SENIOR', 'HAIRCUT');
 INSERT OR IGNORE INTO barber_service (id, barberId, serviceId, seniority, specializationType) VALUES ('aa000000-0002-0000-0000-000000000002', 'c1b2c3d4-0003-0000-0000-000000000003', 'f1000000-0001-0000-0000-000000000001', 'SENIOR', 'HAIRCUT');
-INSERT OR IGNORE INTO barber_service (id, barberId, serviceId, seniority, specializationType) VALUES ('aa000000-0003-0000-0000-000000000003', 'd1b2c3d4-0004-0000-0000-000000000004', 'f1000000-0001-0000-0000-000000000001', 'JUNIOR', 'HAIRCUT');
 
-INSERT OR IGNORE INTO barber_service (id, barberId, serviceId, seniority, specializationType) VALUES ('aa000000-0004-0000-0000-000000000004', 'c1b2c3d4-0003-0000-0000-000000000003', 'f1000000-0002-0000-0000-000000000002', 'SENIOR', 'HAIRCUT');
-INSERT OR IGNORE INTO barber_service (id, barberId, serviceId, seniority, specializationType) VALUES ('aa000000-0005-0000-0000-000000000005', 'd1b2c3d4-0004-0000-0000-000000000004', 'f1000000-0002-0000-0000-000000000002', 'JUNIOR', 'HAIRCUT');
-
-INSERT OR IGNORE INTO barber_service (id, barberId, serviceId, seniority, specializationType) VALUES ('aa000000-0006-0000-0000-000000000006', 'b1b2c3d4-0002-0000-0000-000000000002', 'f1000000-0004-0000-0000-000000000004', 'SENIOR', 'BEARD');
-INSERT OR IGNORE INTO barber_service (id, barberId, serviceId, seniority, specializationType) VALUES ('aa000000-0007-0000-0000-000000000007', 'e1b2c3d4-0005-0000-0000-000000000005', 'f1000000-0004-0000-0000-000000000004', 'JUNIOR', 'BEARD');
-
-INSERT OR IGNORE INTO barber_service (id, barberId, serviceId, seniority, specializationType) VALUES ('aa000000-0008-0000-0000-000000000008', 'c1b2c3d4-0003-0000-0000-000000000003', 'f1000000-0006-0000-0000-000000000006', 'SENIOR', 'BEARD');
+INSERT OR IGNORE INTO barber_service (id, barberId, serviceId, seniority, specializationType) VALUES ('aa000000-0003-0000-0000-000000000003', 'd1b2c3d4-0004-0000-0000-000000000004', 'f1000000-0004-0000-0000-000000000004', 'JUNIOR', 'BEARD');
+INSERT OR IGNORE INTO barber_service (id, barberId, serviceId, seniority, specializationType) VALUES ('aa000000-0004-0000-0000-000000000004', 'e1b2c3d4-0005-0000-0000-000000000005', 'f1000000-0004-0000-0000-000000000004', 'JUNIOR', 'BEARD');
 
 -- ───────────────────────────────────────────────
 -- Schedules — every barber works a different window
@@ -139,33 +127,37 @@ INSERT OR IGNORE INTO extra_service (id, type, name, price, description) VALUES 
 -- ───────────────────────────────────────────────
 -- Appointments — anchored on 2026-08-02 (Sunday)
 -- ───────────────────────────────────────────────
--- Every row uses a barber who really offers that service, at a time inside that barber's hours.
--- The two future ones on 2026-08-03 also make the "slots differ per barber" demo concrete:
--- Marcus is booked 09:00–09:30 and Elena 12:00–12:30 that day, so each loses a different slot.
+-- Every row uses a barber who really offers that service, at a time inside that barber's hours,
+-- and no two appointments overlap for the customer.
+--
+-- The two future ones on 2026-08-03 make the "slots differ per barber" demo concrete: Marcus is
+-- booked 09:00–09:30 and Elena 12:00–12:30 that day, so each loses a different slot from the
+-- Classic Scissor Cut list.
 --
 -- PAST (before 2026-08-02):
 -- Mon 2026-07-27 — Marcus, Classic Scissor Cut (09:00–13:00 shift). Reviewed, with the AAAA
 -- promo applied: 35 base + 15 scotch = 50, less 20% = 40.
 INSERT OR IGNORE INTO appointment (id, customerId, barberId, serviceId, date, startTime, endTime, status, paymentStatus, paymentMethod, totalPrice, notes, cancellationReason) VALUES ('dd000000-0001-0000-0000-000000000001', 'a1b2c3d4-0001-0000-0000-000000000001', 'b1b2c3d4-0002-0000-0000-000000000002', 'f1000000-0001-0000-0000-000000000001', '2026-07-27', '10:00', '10:30', 'COMPLETED', 'PAID', 'CARD', 40, NULL, NULL);
--- Thu 2026-07-30 — Viktor, Classic Beard Trim (15:00–20:00 late shift). No review.
+-- Thu 2026-07-30 — Viktor, Classic Beard Trim (15:00–20:00 late shift). No review, so the
+-- "Write Review" flow is demonstrable.
 INSERT OR IGNORE INTO appointment (id, customerId, barberId, serviceId, date, startTime, endTime, status, paymentStatus, paymentMethod, totalPrice, notes, cancellationReason) VALUES ('dd000000-0002-0000-0000-000000000002', 'a1b2c3d4-0001-0000-0000-000000000001', 'e1b2c3d4-0005-0000-0000-000000000005', 'f1000000-0004-0000-0000-000000000004', '2026-07-30', '16:00', '16:30', 'COMPLETED', 'PAID', 'CASH', 25, NULL, NULL);
--- Wed 2026-07-29 — Leo, High-Skin Fade (09:00–17:00 full day). Reviewed; different barber+service.
-INSERT OR IGNORE INTO appointment (id, customerId, barberId, serviceId, date, startTime, endTime, status, paymentStatus, paymentMethod, totalPrice, notes, cancellationReason) VALUES ('dd000000-0007-0000-0000-000000000007', 'a1b2c3d4-0001-0000-0000-000000000001', 'd1b2c3d4-0004-0000-0000-000000000004', 'f1000000-0002-0000-0000-000000000002', '2026-07-29', '10:00', '10:45', 'COMPLETED', 'PAID', 'MOBILE', 40, NULL, NULL);
--- Tue 2026-07-28 — Elena, High-Skin Fade (12:00–18:00 shift). Cancelled.
-INSERT OR IGNORE INTO appointment (id, customerId, barberId, serviceId, date, startTime, endTime, status, paymentStatus, paymentMethod, totalPrice, notes, cancellationReason) VALUES ('dd000000-0005-0000-0000-000000000005', 'a1b2c3d4-0001-0000-0000-000000000001', 'c1b2c3d4-0003-0000-0000-000000000003', 'f1000000-0002-0000-0000-000000000002', '2026-07-28', '13:00', '13:45', 'CANCELLED', 'UNPAID', 'CASH', 40, NULL, 'Schedule conflict on my end');
+-- Wed 2026-07-29 — Leo, Classic Beard Trim (09:00–17:00 full day). Reviewed; different barber.
+INSERT OR IGNORE INTO appointment (id, customerId, barberId, serviceId, date, startTime, endTime, status, paymentStatus, paymentMethod, totalPrice, notes, cancellationReason) VALUES ('dd000000-0007-0000-0000-000000000007', 'a1b2c3d4-0001-0000-0000-000000000001', 'd1b2c3d4-0004-0000-0000-000000000004', 'f1000000-0004-0000-0000-000000000004', '2026-07-29', '10:00', '10:30', 'COMPLETED', 'PAID', 'MOBILE', 25, NULL, NULL);
+-- Tue 2026-07-28 — Elena, Classic Scissor Cut (12:00–18:00 shift). Cancelled.
+INSERT OR IGNORE INTO appointment (id, customerId, barberId, serviceId, date, startTime, endTime, status, paymentStatus, paymentMethod, totalPrice, notes, cancellationReason) VALUES ('dd000000-0005-0000-0000-000000000005', 'a1b2c3d4-0001-0000-0000-000000000001', 'c1b2c3d4-0003-0000-0000-000000000003', 'f1000000-0001-0000-0000-000000000001', '2026-07-28', '13:00', '13:30', 'CANCELLED', 'UNPAID', 'CASH', 35, NULL, 'Schedule conflict on my end');
 
 -- FUTURE (after 2026-08-02):
--- Mon 2026-08-03 — Marcus, Classic Beard Trim (09:00–13:00 shift), with a cigar extra.
-INSERT OR IGNORE INTO appointment (id, customerId, barberId, serviceId, date, startTime, endTime, status, paymentStatus, paymentMethod, totalPrice, notes, cancellationReason) VALUES ('dd000000-0003-0000-0000-000000000003', 'a1b2c3d4-0001-0000-0000-000000000001', 'b1b2c3d4-0002-0000-0000-000000000002', 'f1000000-0004-0000-0000-000000000004', '2026-08-03', '09:00', '09:30', 'CONFIRMED', 'UNPAID', 'MOBILE', 45, NULL, NULL);
+-- Mon 2026-08-03 — Marcus, Classic Scissor Cut (09:00–13:00 shift), with a cigar extra.
+INSERT OR IGNORE INTO appointment (id, customerId, barberId, serviceId, date, startTime, endTime, status, paymentStatus, paymentMethod, totalPrice, notes, cancellationReason) VALUES ('dd000000-0003-0000-0000-000000000003', 'a1b2c3d4-0001-0000-0000-000000000001', 'b1b2c3d4-0002-0000-0000-000000000002', 'f1000000-0001-0000-0000-000000000001', '2026-08-03', '09:00', '09:30', 'CONFIRMED', 'UNPAID', 'MOBILE', 55, NULL, NULL);
 -- Mon 2026-08-03 — Elena, Classic Scissor Cut (12:00–18:00 shift), same day, different barber.
 INSERT OR IGNORE INTO appointment (id, customerId, barberId, serviceId, date, startTime, endTime, status, paymentStatus, paymentMethod, totalPrice, notes, cancellationReason) VALUES ('dd000000-0004-0000-0000-000000000004', 'a1b2c3d4-0001-0000-0000-000000000001', 'c1b2c3d4-0003-0000-0000-000000000003', 'f1000000-0001-0000-0000-000000000001', '2026-08-03', '12:00', '12:30', 'CONFIRMED', 'UNPAID', 'CASH', 35, NULL, NULL);
--- Wed 2026-08-05 — Leo, Classic Scissor Cut (09:00–17:00 full day).
-INSERT OR IGNORE INTO appointment (id, customerId, barberId, serviceId, date, startTime, endTime, status, paymentStatus, paymentMethod, totalPrice, notes, cancellationReason) VALUES ('dd000000-0008-0000-0000-000000000008', 'a1b2c3d4-0001-0000-0000-000000000001', 'd1b2c3d4-0004-0000-0000-000000000004', 'f1000000-0001-0000-0000-000000000001', '2026-08-05', '09:30', '10:00', 'NEW', 'UNPAID', 'CASH', 35, NULL, NULL);
+-- Wed 2026-08-05 — Viktor, Classic Beard Trim (15:00–20:00 late shift).
+INSERT OR IGNORE INTO appointment (id, customerId, barberId, serviceId, date, startTime, endTime, status, paymentStatus, paymentMethod, totalPrice, notes, cancellationReason) VALUES ('dd000000-0008-0000-0000-000000000008', 'a1b2c3d4-0001-0000-0000-000000000001', 'e1b2c3d4-0005-0000-0000-000000000005', 'f1000000-0004-0000-0000-000000000004', '2026-08-05', '15:30', '16:00', 'NEW', 'UNPAID', 'CASH', 25, NULL, NULL);
 
--- Extra services linked to appointments (composition: they die with the appointment)
+-- Extra services linked to appointments
 INSERT OR IGNORE INTO appointment_extra (appointmentId, extraServiceId) VALUES ('dd000000-0001-0000-0000-000000000001', 'cc000000-0001-0000-0000-000000000001');
 INSERT OR IGNORE INTO appointment_extra (appointmentId, extraServiceId) VALUES ('dd000000-0003-0000-0000-000000000003', 'cc000000-0002-0000-0000-000000000002');
 
--- Reviews — two of the three completed appointments, different barbers and services
+-- Reviews — two of the three completed appointments, different barbers
 INSERT OR IGNORE INTO review (id, appointmentId, customerId, rating, comment, date) VALUES ('ee000000-0001-0000-0000-000000000001', 'dd000000-0001-0000-0000-000000000001', 'a1b2c3d4-0001-0000-0000-000000000001', 5, 'Marcus nailed the scissor cut and the scotch was a great touch. The promo made it a steal.', '2026-07-27');
-INSERT OR IGNORE INTO review (id, appointmentId, customerId, rating, comment, date) VALUES ('ee000000-0002-0000-0000-000000000002', 'dd000000-0007-0000-0000-000000000007', 'a1b2c3d4-0001-0000-0000-000000000001', 4, 'Leo was quick and precise with the fade. Clean finish, would book again.', '2026-07-29');
+INSERT OR IGNORE INTO review (id, appointmentId, customerId, rating, comment, date) VALUES ('ee000000-0002-0000-0000-000000000002', 'dd000000-0007-0000-0000-000000000007', 'a1b2c3d4-0001-0000-0000-000000000001', 4, 'Leo was quick and precise with the beard line-up. Clean finish, would book again.', '2026-07-29');

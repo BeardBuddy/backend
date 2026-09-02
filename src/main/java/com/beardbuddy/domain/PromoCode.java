@@ -6,10 +6,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Promo codes are fixtures, not persisted entities: there is no promo_code table and no admin
- * screen that could create one. The catalogue below is the whole set.
- */
 public final class PromoCode {
 
     private static final List<PromoCode> FIXTURES = List.of(
