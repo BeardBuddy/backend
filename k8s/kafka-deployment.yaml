@@ -48,6 +48,13 @@ spec:
     metadata:
       labels: { app: kafka }
     spec:
+      # Kubernetes injects a KAFKA_PORT=tcp://<clusterIP>:9092 variable for the
+      # kafka Service, and the confluent entrypoint turns every KAFKA_* variable
+      # into a broker property -- so the broker reads port=tcp://... , fails to
+      # parse it as an integer and exits 1 before it ever starts. Opting out of
+      # the legacy service links is the fix; nothing here resolves peers that
+      # way, they all use DNS.
+      enableServiceLinks: false
       containers:
         - name: kafka
           image: confluentinc/cp-kafka:7.6.1
