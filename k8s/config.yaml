@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: beardbuddy-config
+  namespace: beardbuddy
+data:
+  SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/beardbuddy
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  BEARDBUDDY_CORS_ORIGINS: http://localhost:3000
+  BEARDBUDDY_KAFKA_BARBER_TOPIC: barber.created
+  BEARDBUDDY_SCHEDULE_HORIZON_DAYS: "365"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: beardbuddy-secret
+  namespace: beardbuddy
+type: Opaque
+stringData:
+  # Demo values. Replace before any real deployment.
+  SPRING_DATASOURCE_USERNAME: beardbuddy
+  SPRING_DATASOURCE_PASSWORD: beardbuddy
+  BEARDBUDDY_JWT_SECRET: change-me-in-production-at-least-32-bytes
