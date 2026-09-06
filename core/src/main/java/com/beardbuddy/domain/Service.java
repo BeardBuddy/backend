@@ -41,21 +41,21 @@ public class Service {
     @Column(name = "description", nullable = false)
     private String description;
 
-    @Column(name = "isAvailable")
+    @Column
     private Boolean isAvailable;
 
-    @Column(name = "requiresStyling")
+    @Column
     private Boolean requiresStyling;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "complexityLevel")
+    @Column
     private CertificationLevel complexityLevel;
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "service_sub_service",
-            joinColumns = @JoinColumn(name = "serviceId"),
-            inverseJoinColumns = @JoinColumn(name = "subServiceId")
+            joinColumns = @JoinColumn(name = "service_id"),
+            inverseJoinColumns = @JoinColumn(name = "sub_service_id")
     )
     private List<Service> subServices = new ArrayList<>();
 

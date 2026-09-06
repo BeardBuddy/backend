@@ -21,17 +21,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "\"user\"")
+@Table(name = "app_user")
 public class User {
 
     @Id
     @Column(name = "id")
     private String id;
 
-    @Column(name = "firstName", nullable = false)
+    @Column(nullable = false)
     private String firstName;
 
-    @Column(name = "lastName", nullable = false)
+    @Column(nullable = false)
     private String lastName;
 
     @Column(name = "phone", nullable = false)
@@ -40,14 +40,14 @@ public class User {
     @Column(name = "email")
     private String email;
 
-    @Column(name = "dateOfBirth", nullable = false)
+    @Column(nullable = false)
     private String dateOfBirth;
 
     @Column(name = "username", unique = true)
     private String username;
 
     /** BCrypt hash; null for barbers, who never sign in. */
-    @Column(name = "passwordHash")
+    @Column
     private String passwordHash;
 
     @Enumerated(EnumType.STRING)
@@ -55,52 +55,52 @@ public class User {
     private UserRole role;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "seniorityLevel")
+    @Column
     private SeniorityLevel seniorityLevel;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "specializationType")
+    @Column
     private SpecializationType specializationType;
 
-    @Column(name = "experienceYears")
+    @Column
     private Integer experienceYears;
 
-    @Column(name = "hireDate")
+    @Column
     private String hireDate;
 
     @Column(name = "description")
     private String description;
 
-    @Column(name = "loyaltyPoints")
+    @Column
     private Integer loyaltyPoints;
 
-    @Column(name = "managementAccess")
+    @Column
     private Boolean managementAccess;
 
-    @Column(name = "canMentor")
+    @Column
     private Boolean canMentor;
 
     @Convert(converter = StringListJsonConverter.class)
     @Column(name = "certifications")
     private List<String> certifications;
 
-    @Column(name = "maxClientsPerDay")
+    @Column
     private Integer maxClientsPerDay;
 
-    @Column(name = "scissorsMastery")
+    @Column
     private Boolean scissorsMastery;
 
-    @Column(name = "supportsLongHair")
+    @Column
     private Boolean supportsLongHair;
 
-    @Column(name = "trimMastery")
+    @Column
     private Boolean trimMastery;
 
-    @Column(name = "supportsHotTowel")
+    @Column
     private Boolean supportsHotTowel;
 
     @Convert(converter = StringListJsonConverter.class)
-    @Column(name = "beardCareKnowledge")
+    @Column
     private List<String> beardCareKnowledge;
 
     @OneToMany(mappedBy = "barber", fetch = FetchType.LAZY)
