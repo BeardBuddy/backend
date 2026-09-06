@@ -21,6 +21,9 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+      # ZooKeeper denies four-letter-word commands by default (only srvr is enabled),
+      # so ruok must be whitelisted for the healthcheck below to get a response.
+      KAFKA_OPTS: -Dzookeeper.4lw.commands.whitelist=srvr,ruok
     healthcheck:
       test: ["CMD-SHELL", "echo ruok | nc -w 2 localhost 2181 | grep imok"]
       interval: 5s
@@ -55,7 +58,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile.api
+      dockerfile: Dockerfile.api.local
     ports: ["8080:8080"]
     depends_on:
       postgres:
@@ -75,7 +78,7 @@ services:
   worker:
     build:
       context: .
-      dockerfile: Dockerfile.worker
+      dockerfile: Dockerfile.worker.local
     depends_on:
       postgres:
         condition: service_healthy
@@ -97,9 +100,12 @@ services:
   frontend:
     build:
       context: ${FRONTEND_PATH:-../masproject}
-      args:
-        NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+      dockerfile: Dockerfile.local
     ports: ["3000:3000"]
+    environment:
+      # Read at request time by /api/config, so the image is environment-agnostic.
+      # The browser calls the backend directly, hence localhost rather than a service name.
+      API_BASE_URL: http://localhost:8080
     depends_on:
       app:
         condition: service_started

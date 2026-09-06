@@ -22,7 +22,7 @@ import java.util.List;
         name = "barber_service",
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_barber_service_barber_service",
-                columnNames = {"barberId", "serviceId"}
+                columnNames = {"barber_id", "serviceId"}
         )
 )
 public class BarberService {
@@ -32,11 +32,11 @@ public class BarberService {
     private String id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "barberId", nullable = false)
+    @JoinColumn(name = "barber_id", nullable = false)
     private User barber;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "serviceId", nullable = false)
+    @JoinColumn(name = "service_id", nullable = false)
     private Service service;
 
     @Enumerated(EnumType.STRING)
@@ -44,21 +44,21 @@ public class BarberService {
     private SeniorityLevel seniority;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "specializationType", nullable = false)
+    @Column(nullable = false)
     private SpecializationType specializationType;
 
-    @Column(name = "yearsOfExperience")
+    @Column
     private Integer yearsOfExperience;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "certificationLevel")
+    @Column
     private CertificationLevel certificationLevel;
 
     @Convert(converter = StringListJsonConverter.class)
-    @Column(name = "coursesCompleted")
+    @Column
     private List<String> coursesCompleted;
 
-    @Column(name = "acquiredAt")
+    @Column
     private String acquiredAt;
 
     @Column(name = "notes")

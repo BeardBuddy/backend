@@ -1,0 +1,24 @@
+# The API owns the schema: on boot it drops every table and reseeds
+# (spring.sql.init.mode=always). The workers consume barber.created and write
+# User/Schedule rows, so a worker that starts first races the drop and loses its
+# inserts. docker-compose sequenced this with depends_on/healthcheck; Deployments
+# have no such ordering, so hold each worker until the API answers.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: beardbuddy
+  name: worker
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: wait-for-api
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until wget -q -O /dev/null "http://backend:8080/actuator/health/readiness"; do
+                echo "waiting for the api to finish seeding..."
+                sleep 3
+              done
