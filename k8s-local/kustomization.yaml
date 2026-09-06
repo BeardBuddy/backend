@@ -1,0 +1,35 @@
+# Local verification overlay: run the whole stack on Docker Desktop's Kubernetes
+# without a registry.
+#
+#   docker build ... -t beardbuddy/api:local ...   (see README)
+#   kubectl apply -k k8s-local
+#
+# The base manifests describe the real deployment: images pulled from GHCR with
+# imagePullPolicy Always. Locally we have no registry and no pull secret, so this
+# overlay retags the three first-party images to the ones built on this machine
+# and switches the policy to Never, which makes the kubelet use Docker Desktop's
+# shared image store instead of trying to reach ghcr.io.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: beardbuddy
+
+resources:
+  - ../k8s
+
+images:
+  - name: ghcr.io/beardbuddy/backend/api
+    newName: beardbuddy/api
+    newTag: local
+  - name: ghcr.io/beardbuddy/backend/worker
+    newName: beardbuddy/worker
+    newTag: local
+  - name: ghcr.io/beardbuddy/frontend/frontend
+    newName: beardbuddy/frontend
+    newTag: local
+
+patches:
+  - path: pull-policy-backend.yaml
+  - path: pull-policy-worker.yaml
+  - path: pull-policy-frontend.yaml
+  - path: worker-wait-for-api.yaml

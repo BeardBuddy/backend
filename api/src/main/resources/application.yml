@@ -53,6 +53,16 @@ beardbuddy:
     # How far ahead the worker materialises schedules.
     horizon-days: ${BEARDBUDDY_SCHEDULE_HORIZON_DAYS:365}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
 logging:
   level:
     org.hibernate.SQL: warn

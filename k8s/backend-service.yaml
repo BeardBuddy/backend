@@ -19,10 +19,16 @@ spec:
           envFrom:
             - configMapRef: { name: beardbuddy-config }
             - secretRef: { name: beardbuddy-secret }
+          # Must be an unauthenticated path: every /api/** route answers 401
+          # behind the jwt filter, and kubernetes only counts 2xx/3xx as ready.
           readinessProbe:
-            httpGet: { path: /api/services, port: 8080 }
-            initialDelaySeconds: 30
+            httpGet: { path: /actuator/health/readiness, port: 8080 }
+            initialDelaySeconds: 20
             periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8080 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
           resources:
             requests: { cpu: 250m, memory: 512Mi }
             limits: { cpu: "1", memory: 1Gi }
@@ -63,6 +69,10 @@ spec:
             httpGet: { path: /actuator/health/readiness, port: 8081 }
             initialDelaySeconds: 30
             periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8081 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
           resources:
             requests: { cpu: 250m, memory: 512Mi }
             limits: { cpu: "1", memory: 1Gi }
