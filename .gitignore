@@ -7,3 +7,10 @@ target/
 *.iml
 .vscode/
 .DS_Store
+
+# Secrets — New Relic keys live here, never commit
+.env
+.env.*
+
+# Downloaded New Relic java agent (jars + license key)
+opt/

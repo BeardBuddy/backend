@@ -1,0 +1,61 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: beardbuddy-api
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/beardbuddy}
+    username: ${SPRING_DATASOURCE_USERNAME:beardbuddy}
+    password: ${SPRING_DATASOURCE_PASSWORD:beardbuddy}
+    driver-class-name: org.postgresql.Driver
+
+  sql:
+    init:
+      # The API owns the schema: it drops and recreates every table, then seeds.
+      # The worker must NOT do this (see the worker's own config).
+      mode: always
+      schema-locations: classpath:schema.sql
+      data-locations: classpath:data.sql
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    # Seed scripts must run before Hibernate touches anything.
+    defer-datasource-initialization: false
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        # Batch aggressively: /barbers/load publishes thousands of events in a burst.
+        linger.ms: 20
+        batch.size: 65536
+      acks: all
+
+beardbuddy:
+  cors:
+    allowed-origins: ${BEARDBUDDY_CORS_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
+  kafka:
+    barber-topic: ${BEARDBUDDY_KAFKA_BARBER_TOPIC:barber.created}
+  jwt:
+    # Override in every real deployment: docker-compose and k8s both pass this in.
+    secret: ${BEARDBUDDY_JWT_SECRET:local-dev-secret-change-me-please-32-bytes-min}
+    ttl-minutes: ${BEARDBUDDY_JWT_TTL_MINUTES:120}
+  schedule:
+    # How far ahead the worker materialises schedules.
+    horizon-days: ${BEARDBUDDY_SCHEDULE_HORIZON_DAYS:365}
+
+logging:
+  level:
+    org.hibernate.SQL: warn
+    org.apache.kafka: warn

@@ -1,0 +1,71 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: beardbuddy-worker
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/beardbuddy}
+    username: ${SPRING_DATASOURCE_USERNAME:beardbuddy}
+    password: ${SPRING_DATASOURCE_PASSWORD:beardbuddy}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      # Batch inserts run on the listener threads; give each one a connection.
+      maximum-pool-size: 10
+
+  sql:
+    init:
+      # The API owns the schema. If the worker also ran schema.sql it would drop the
+      # tables out from under the API on every restart.
+      mode: never
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          batch_size: 500
+        order_inserts: true
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${BEARDBUDDY_KAFKA_GROUP:beardbuddy-worker}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.trusted.packages: com.beardbuddy.messaging
+        spring.json.value.default.type: com.beardbuddy.messaging.BarberCreatedEvent
+      max-poll-records: 100
+    listener:
+      # Events arrive in batches so 5000 barbers do not mean 5000 round trips.
+      type: batch
+      concurrency: ${BEARDBUDDY_KAFKA_CONCURRENCY:3}
+      ack-mode: batch
+
+beardbuddy:
+  kafka:
+    barber-topic: ${BEARDBUDDY_KAFKA_BARBER_TOPIC:barber.created}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    org.hibernate.SQL: warn
+    org.apache.kafka: warn
