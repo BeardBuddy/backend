@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.beardbuddy</groupId>
+    <artifactId>beardbuddy-parent</artifactId>
+    <version>1.0.0</version>
+  </parent>
+
+  <artifactId>beardbuddy-worker</artifactId>
+  <name>beardbuddy-worker</name>
+  <description>Kafka consumer that materialises a year of schedules for each newly loaded barber</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.beardbuddy</groupId>
+      <artifactId>beardbuddy-core</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.kafka</groupId>
+      <artifactId>spring-kafka</artifactId>
+    </dependency>
+    <!-- Actuator only, so the worker exposes a health endpoint for k8s probes. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.newrelic.logging</groupId>
+      <artifactId>logback</artifactId>
+      <version>3.3.0</version>
+    </dependency>
+    <dependency>
+      <groupId>net.logstash.logback</groupId>
+      <artifactId>logstash-logback-encoder</artifactId>
+      <version>8.0</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>beardbuddy-worker</finalName>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>
