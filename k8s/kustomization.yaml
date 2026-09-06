@@ -1,0 +1,13 @@
+# The deployment as it runs for real: images from GHCR, pulled on every start.
+# For local verification use the overlay in ../k8s-local, which points the three
+# first-party images at locally built ones instead.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - config.yaml
+  - postgres-deployment.yaml
+  - kafka-deployment.yaml
+  - backend-service.yaml
+  - frontend-service.yaml
