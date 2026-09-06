@@ -1,18 +1,5 @@
-# ---- build ----------------------------------------------------------------
-FROM maven:3.9-eclipse-temurin-17 AS build
-WORKDIR /build
-
-COPY pom.xml .
-COPY core/pom.xml core/
-COPY api/pom.xml api/
-COPY worker/pom.xml worker/
-RUN mvn -B -q dependency:go-offline -pl core,worker -am || true
-
-COPY core/src core/src
-COPY worker/src worker/src
-RUN mvn -B -q -DskipTests -pl core,worker -am package
-
-# ---- run ------------------------------------------------------------------
+# Runtime-only image: CI builds the jar and this just packages it.
+# For a from-source build use Dockerfile.worker.local.
 FROM eclipse-temurin:17-jre
 WORKDIR /app
 
@@ -21,7 +8,8 @@ RUN useradd --system --uid 10001 beardbuddy \
  && chown -R beardbuddy:beardbuddy /var/log/beardbuddy
 USER beardbuddy
 
-COPY --from=build /build/worker/target/beardbuddy-worker.jar app.jar
+# Produced by `mvn -pl core,worker -am package`.
+COPY worker/target/beardbuddy-worker.jar app.jar
 
 EXPOSE 8081
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

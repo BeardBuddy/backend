@@ -13,8 +13,8 @@ spec:
     spec:
       containers:
         - name: api
-          image: beardbuddy/api:latest
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/beardbuddy/backend/api:latest
+          imagePullPolicy: Always
           ports: [{ containerPort: 8080 }]
           envFrom:
             - configMapRef: { name: beardbuddy-config }
@@ -53,8 +53,8 @@ spec:
     spec:
       containers:
         - name: worker
-          image: beardbuddy/worker:latest
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/beardbuddy/backend/worker:latest
+          imagePullPolicy: Always
           ports: [{ containerPort: 8081 }]
           envFrom:
             - configMapRef: { name: beardbuddy-config }

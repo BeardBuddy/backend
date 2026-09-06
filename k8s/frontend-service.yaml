@@ -13,9 +13,15 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: beardbuddy/frontend:latest
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/beardbuddy/frontend/frontend:latest
+          imagePullPolicy: Always
           ports: [{ containerPort: 3000 }]
+          env:
+            # Resolved per request by /api/config, so this image is not environment-specific.
+            # The browser calls the backend directly, so this must be reachable from outside
+            # the cluster — not the in-cluster Service DNS name.
+            - name: API_BASE_URL
+              value: http://localhost:30080
           readinessProbe:
             httpGet: { path: /, port: 3000 }
             initialDelaySeconds: 15

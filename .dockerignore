@@ -1,7 +1,22 @@
-target/
-*/target/
+# target/ is NOT ignored: the runtime Dockerfiles copy prebuilt jars from it.
+# The .local Dockerfiles build from source and produce their own target/ inside
+# the builder stage, so nothing leaks between them.
 *.db
 *.db-*
 .git/
+.github/
 .idea/
 *.iml
+.vscode/
+.DS_Store
+
+# Secrets and the vendored New Relic agent
+.env
+.env.*
+opt/
+
+# Intermediate build output that images never need
+**/target/classes/
+**/target/generated-sources/
+**/target/maven-status/
+**/target/surefire-reports/
