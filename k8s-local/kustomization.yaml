@@ -32,4 +32,5 @@ patches:
   - path: pull-policy-backend.yaml
   - path: pull-policy-worker.yaml
   - path: pull-policy-frontend.yaml
+  - path: backend-wait-for-deps.yaml
   - path: worker-wait-for-api.yaml
