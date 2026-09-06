@@ -18,33 +18,33 @@ DROP TABLE IF EXISTS barber_service CASCADE;
 DROP TABLE IF EXISTS schedule CASCADE;
 DROP TABLE IF EXISTS extra_service CASCADE;
 DROP TABLE IF EXISTS service CASCADE;
-DROP TABLE IF EXISTS "user" CASCADE;
+DROP TABLE IF EXISTS app_user CASCADE;
 
-CREATE TABLE IF NOT EXISTS "user" (
+CREATE TABLE IF NOT EXISTS app_user (
   id                  TEXT PRIMARY KEY,
-  "firstName"           TEXT NOT NULL,
-  "lastName"            TEXT NOT NULL,
+  first_name           TEXT NOT NULL,
+  last_name            TEXT NOT NULL,
   phone               TEXT NOT NULL,
   email               TEXT,
-  "dateOfBirth"         TEXT NOT NULL,
+  date_of_birth         TEXT NOT NULL,
   username            TEXT UNIQUE,
-  "passwordHash"        TEXT,
+  password_hash        TEXT,
   role                TEXT NOT NULL CHECK(role IN ('CUSTOMER','BARBER')),
-  "seniorityLevel"      TEXT CHECK("seniorityLevel" IN ('SENIOR','JUNIOR')),
-  "specializationType"  TEXT CHECK("specializationType" IN ('HAIRCUT','BEARD')),
-  "experienceYears"     INTEGER,
-  "hireDate"            TEXT,
+  seniority_level      TEXT CHECK(seniority_level IN ('SENIOR','JUNIOR')),
+  specialization_type  TEXT CHECK(specialization_type IN ('HAIRCUT','BEARD')),
+  experience_years     INTEGER,
+  hire_date            TEXT,
   description         TEXT,
-  "loyaltyPoints"       INTEGER DEFAULT 0,
-  "managementAccess"    INTEGER DEFAULT 0,
-  "canMentor"           INTEGER DEFAULT 0,
+  loyalty_points       INTEGER DEFAULT 0,
+  management_access    BOOLEAN DEFAULT FALSE,
+  can_mentor           BOOLEAN DEFAULT FALSE,
   certifications      TEXT,
-  "maxClientsPerDay"    INTEGER,
-  "scissorsMastery"     INTEGER,
-  "supportsLongHair"    INTEGER,
-  "trimMastery"         INTEGER,
-  "supportsHotTowel"    INTEGER,
-  "beardCareKnowledge"  TEXT
+  max_clients_per_day    INTEGER,
+  scissors_mastery     BOOLEAN,
+  supports_long_hair    BOOLEAN,
+  trim_mastery         BOOLEAN,
+  supports_hot_towel    BOOLEAN,
+  beard_care_knowledge  TEXT
 );
 
 CREATE TABLE IF NOT EXISTS service (
@@ -54,15 +54,15 @@ CREATE TABLE IF NOT EXISTS service (
   type             TEXT NOT NULL CHECK(type IN ('HAIRCUT','BEARD','HYBRID')),
   duration         INTEGER NOT NULL,
   description      TEXT NOT NULL,
-  "isAvailable"      INTEGER DEFAULT 1,
-  "requiresStyling"  INTEGER,
-  "complexityLevel"  TEXT CHECK("complexityLevel" IN ('BEGINNER','INTERMEDIATE','EXPERT'))
+  is_available      BOOLEAN DEFAULT TRUE,
+  requires_styling  BOOLEAN,
+  complexity_level  TEXT CHECK(complexity_level IN ('BEGINNER','INTERMEDIATE','EXPERT'))
 );
 
 CREATE TABLE IF NOT EXISTS service_sub_service (
-  "serviceId"    TEXT NOT NULL REFERENCES service(id),
-  "subServiceId" TEXT NOT NULL REFERENCES service(id),
-  PRIMARY KEY ("serviceId", "subServiceId")
+  service_id    TEXT NOT NULL REFERENCES service(id),
+  sub_service_id TEXT NOT NULL REFERENCES service(id),
+  PRIMARY KEY (service_id, sub_service_id)
 );
 
 -- A service may be offered by several barbers, and a barber offers several services:
@@ -70,27 +70,27 @@ CREATE TABLE IF NOT EXISTS service_sub_service (
 -- registered twice for the same service.
 CREATE TABLE IF NOT EXISTS barber_service (
   id                 TEXT PRIMARY KEY,
-  "barberId"           TEXT NOT NULL REFERENCES "user"(id),
-  "serviceId"          TEXT NOT NULL REFERENCES service(id),
+  barber_id           TEXT NOT NULL REFERENCES app_user(id),
+  service_id          TEXT NOT NULL REFERENCES service(id),
   seniority          TEXT NOT NULL CHECK(seniority IN ('SENIOR','JUNIOR')),
-  "specializationType" TEXT NOT NULL CHECK("specializationType" IN ('HAIRCUT','BEARD')),
-  "yearsOfExperience"  INTEGER,
-  "certificationLevel" TEXT CHECK("certificationLevel" IN ('BEGINNER','INTERMEDIATE','EXPERT')),
-  "coursesCompleted"   TEXT,
-  "acquiredAt"         TEXT,
+  specialization_type TEXT NOT NULL CHECK(specialization_type IN ('HAIRCUT','BEARD')),
+  years_of_experience  INTEGER,
+  certification_level TEXT CHECK(certification_level IN ('BEGINNER','INTERMEDIATE','EXPERT')),
+  courses_completed   TEXT,
+  acquired_at         TEXT,
   notes              TEXT,
-  UNIQUE ("barberId", "serviceId")
+  UNIQUE (barber_id, service_id)
 );
 
 CREATE TABLE IF NOT EXISTS schedule (
   id        TEXT PRIMARY KEY,
-  "barberId"  TEXT NOT NULL REFERENCES "user"(id),
-  "dayOfWeek" TEXT NOT NULL CHECK("dayOfWeek" IN ('MON','TUE','WED','THU','FRI','SAT','SUN')),
-  "startTime" TEXT NOT NULL,
-  "endTime"   TEXT NOT NULL,
-  "validFrom" TEXT NOT NULL,
-  "validTo"   TEXT NOT NULL,
-  "isActive"  INTEGER DEFAULT 1
+  barber_id  TEXT NOT NULL REFERENCES app_user(id),
+  day_of_week TEXT NOT NULL CHECK(day_of_week IN ('MON','TUE','WED','THU','FRI','SAT','SUN')),
+  start_time TEXT NOT NULL,
+  end_time   TEXT NOT NULL,
+  valid_from TEXT NOT NULL,
+  valid_to   TEXT NOT NULL,
+  is_active  INTEGER DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS extra_service (
@@ -103,32 +103,32 @@ CREATE TABLE IF NOT EXISTS extra_service (
 
 CREATE TABLE IF NOT EXISTS appointment (
   id                  TEXT PRIMARY KEY,
-  "customerId"          TEXT NOT NULL REFERENCES "user"(id),
-  "barberId"            TEXT NOT NULL REFERENCES "user"(id),
-  "serviceId"           TEXT NOT NULL REFERENCES service(id),
+  customer_id          TEXT NOT NULL REFERENCES app_user(id),
+  barber_id            TEXT NOT NULL REFERENCES app_user(id),
+  service_id           TEXT NOT NULL REFERENCES service(id),
   date                TEXT NOT NULL,
-  "startTime"           TEXT NOT NULL,
-  "endTime"             TEXT NOT NULL,
+  start_time           TEXT NOT NULL,
+  end_time             TEXT NOT NULL,
   status              TEXT NOT NULL DEFAULT 'NEW' CHECK(status IN ('NEW','CONFIRMED','IN_PROGRESS','COMPLETED','CANCELLED')),
-  "paymentStatus"       TEXT NOT NULL DEFAULT 'UNPAID' CHECK("paymentStatus" IN ('UNPAID','PAID','PENDING')),
-  "paymentMethod"       TEXT NOT NULL DEFAULT 'CASH' CHECK("paymentMethod" IN ('CARD','CASH','MOBILE')),
-  "totalPrice"          NUMERIC(10,2) NOT NULL DEFAULT 0,
+  payment_status       TEXT NOT NULL DEFAULT 'UNPAID' CHECK(payment_status IN ('UNPAID','PAID','PENDING')),
+  payment_method       TEXT NOT NULL DEFAULT 'CASH' CHECK(payment_method IN ('CARD','CASH','MOBILE')),
+  total_price          NUMERIC(10,2) NOT NULL DEFAULT 0,
   notes               TEXT,
-  "cancellationReason"  TEXT,
-  "paidAt"              TEXT,
-  "cancelledAt"         TEXT
+  cancellation_reason  TEXT,
+  paid_at              TEXT,
+  cancelled_at         TEXT
 );
 
 CREATE TABLE IF NOT EXISTS appointment_extra (
-  "appointmentId"  TEXT NOT NULL REFERENCES appointment(id),
-  "extraServiceId" TEXT NOT NULL REFERENCES extra_service(id),
-  PRIMARY KEY ("appointmentId", "extraServiceId")
+  appointment_id  TEXT NOT NULL REFERENCES appointment(id),
+  extra_service_id TEXT NOT NULL REFERENCES extra_service(id),
+  PRIMARY KEY (appointment_id, extra_service_id)
 );
 
 CREATE TABLE IF NOT EXISTS review (
   id             TEXT PRIMARY KEY,
-  "appointmentId"  TEXT NOT NULL UNIQUE REFERENCES appointment(id),
-  "customerId"     TEXT NOT NULL REFERENCES "user"(id),
+  appointment_id  TEXT NOT NULL UNIQUE REFERENCES appointment(id),
+  customer_id     TEXT NOT NULL REFERENCES app_user(id),
   rating         INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
   comment        TEXT,
   date           TEXT NOT NULL

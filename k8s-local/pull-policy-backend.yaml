@@ -1,0 +1,14 @@
+# Never = use only what is already in Docker Desktop's image store. Without this
+# the kubelet contacts ghcr.io on every pod start and fails ImagePullBackOff:
+# the packages are private and this overlay carries no pull secret.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: beardbuddy
+  name: backend
+spec:
+  template:
+    spec:
+      containers:
+        - name: api
+          imagePullPolicy: Never

@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: beardbuddy
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: backend }
+  template:
+    metadata:
+      labels: { app: backend }
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/beardbuddy/backend/api:latest
+          imagePullPolicy: Always
+          ports: [{ containerPort: 8080 }]
+          envFrom:
+            - configMapRef: { name: beardbuddy-config }
+            - secretRef: { name: beardbuddy-secret }
+          # Must be an unauthenticated path: every /api/** route answers 401
+          # behind the jwt filter, and kubernetes only counts 2xx/3xx as ready.
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8080 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8080 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { cpu: "1", memory: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: beardbuddy
+spec:
+  type: NodePort
+  selector: { app: backend }
+  ports: [{ port: 8080, targetPort: 8080, nodePort: 30080 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: beardbuddy
+spec:
+  # Scale this out to consume the barber.created partitions in parallel.
+  replicas: 2
+  selector:
+    matchLabels: { app: worker }
+  template:
+    metadata:
+      labels: { app: worker }
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/beardbuddy/backend/worker:latest
+          imagePullPolicy: Always
+          ports: [{ containerPort: 8081 }]
+          envFrom:
+            - configMapRef: { name: beardbuddy-config }
+            - secretRef: { name: beardbuddy-secret }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8081 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8081 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { cpu: "1", memory: 1Gi }

@@ -1,0 +1,23 @@
+# The api opens its datasource during startup and exits if postgres is not
+# accepting connections yet, so on a cold cluster it burns restarts until
+# backoff happens to line up with postgres becoming ready. Deployments have no
+# depends_on, so wait for the port explicitly.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: beardbuddy
+  name: backend
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z postgres 5432; do
+                echo "waiting for postgres..."
+                sleep 3
+              done
