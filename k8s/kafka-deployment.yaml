@@ -18,6 +18,13 @@ spec:
           env:
             - { name: ZOOKEEPER_CLIENT_PORT, value: "2181" }
             - { name: ZOOKEEPER_TICK_TIME, value: "2000" }
+            # ruok is denied unless whitelisted; the readiness probe below needs it.
+            - { name: KAFKA_OPTS, value: "-Dzookeeper.4lw.commands.whitelist=srvr,ruok" }
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "echo ruok | nc -w 2 localhost 2181 | grep imok"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
 ---
 apiVersion: v1
 kind: Service

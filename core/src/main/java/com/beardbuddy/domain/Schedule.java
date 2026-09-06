@@ -27,26 +27,26 @@ public class Schedule {
     private String id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "barberId", nullable = false)
+    @JoinColumn(name = "barber_id", nullable = false)
     private User barber;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "dayOfWeek", nullable = false)
+    @Column(nullable = false)
     private DayOfWeek dayOfWeek;
 
-    @Column(name = "startTime", nullable = false)
+    @Column(nullable = false)
     private String startTime;
 
-    @Column(name = "endTime", nullable = false)
+    @Column(nullable = false)
     private String endTime;
 
-    @Column(name = "validFrom", nullable = false)
+    @Column(nullable = false)
     private String validFrom;
 
-    @Column(name = "validTo", nullable = false)
+    @Column(nullable = false)
     private String validTo;
 
-    @Column(name = "isActive")
+    @Column
     private Integer isActive;
 
     protected Schedule() {

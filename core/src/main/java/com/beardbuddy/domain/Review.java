@@ -21,11 +21,11 @@ public class Review {
     private String id;
 
     @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "appointmentId", nullable = false, unique = true)
+    @JoinColumn(name = "appointment_id", nullable = false, unique = true)
     private Appointment appointment;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "customerId", nullable = false)
+    @JoinColumn(name = "customer_id", nullable = false)
     private User customer;
 
     @Column(name = "rating", nullable = false)

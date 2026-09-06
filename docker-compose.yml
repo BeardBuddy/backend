@@ -21,6 +21,9 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+      # ZooKeeper denies four-letter-word commands by default (only srvr is enabled),
+      # so ruok must be whitelisted for the healthcheck below to get a response.
+      KAFKA_OPTS: -Dzookeeper.4lw.commands.whitelist=srvr,ruok
     healthcheck:
       test: ["CMD-SHELL", "echo ruok | nc -w 2 localhost 2181 | grep imok"]
       interval: 5s

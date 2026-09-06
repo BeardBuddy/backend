@@ -33,24 +33,24 @@ public class Appointment {
     private String id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "customerId", nullable = false)
+    @JoinColumn(name = "customer_id", nullable = false)
     private User customer;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "barberId", nullable = false)
+    @JoinColumn(name = "barber_id", nullable = false)
     private User barber;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "serviceId", nullable = false)
+    @JoinColumn(name = "service_id", nullable = false)
     private Service service;
 
     @Column(name = "date", nullable = false)
     private String date;
 
-    @Column(name = "startTime", nullable = false)
+    @Column(nullable = false)
     private String startTime;
 
-    @Column(name = "endTime", nullable = false)
+    @Column(nullable = false)
     private String endTime;
 
     @Enumerated(EnumType.STRING)
@@ -58,34 +58,34 @@ public class Appointment {
     private AppointmentStatus status;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "paymentStatus", nullable = false)
+    @Column(nullable = false)
     private PaymentStatus paymentStatus;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "paymentMethod", nullable = false)
+    @Column(nullable = false)
     private PaymentMethod paymentMethod;
 
-    @Column(name = "totalPrice", nullable = false)
+    @Column(nullable = false)
     private Double totalPrice;
 
     @Convert(converter = StringListJsonConverter.class)
     @Column(name = "notes")
     private List<String> notes = new ArrayList<>();
 
-    @Column(name = "cancellationReason")
+    @Column
     private String cancellationReason;
 
-    @Column(name = "paidAt")
+    @Column
     private String paidAt;
 
-    @Column(name = "cancelledAt")
+    @Column
     private String cancelledAt;
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "appointment_extra",
-            joinColumns = @JoinColumn(name = "appointmentId"),
-            inverseJoinColumns = @JoinColumn(name = "extraServiceId")
+            joinColumns = @JoinColumn(name = "appointment_id"),
+            inverseJoinColumns = @JoinColumn(name = "extra_service_id")
     )
     private List<ExtraService> extraServices = new ArrayList<>();
 
