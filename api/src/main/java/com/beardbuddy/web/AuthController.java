@@ -5,6 +5,7 @@ import com.beardbuddy.config.JwtService;
 import com.beardbuddy.web.dto.CustomerDto;
 import com.beardbuddy.web.dto.LoginRequest;
 import org.springframework.http.HttpHeaders;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -22,6 +23,15 @@ public class AuthController {
     private final AuthService authService;
     private final JwtService jwtService;
 
+    // Cross-site by default in the cloud: the browser app and the API sit on different
+    // hosts, and a Lax cookie is dropped on those requests. Configurable so a same-origin
+    // local run (docker compose, minikube) can stay on Lax over plain http.
+    @Value("${beardbuddy.cookie.same-site:Lax}")
+    private String cookieSameSite;
+
+    @Value("${beardbuddy.cookie.secure:false}")
+    private boolean cookieSecure;
+
     public AuthController(AuthService authService, JwtService jwtService) {
         this.authService = authService;
         this.jwtService = jwtService;
@@ -31,13 +41,14 @@ public class AuthController {
     public ResponseEntity<CustomerDto> login(@RequestBody LoginRequest request) {
         String token = authService.login(request.username(), request.password());
 
-        // httpOnly so JavaScript cannot read it; SameSite=Lax is enough for a same-site SPA.
+        // httpOnly so JavaScript cannot read it. SameSite/Secure come from config because
+        // SameSite=None is only honoured on a Secure cookie, and Secure needs https.
         ResponseCookie cookie = ResponseCookie.from(JwtService.COOKIE_NAME, token)
                 .httpOnly(true)
-                .secure(false)
+                .secure(cookieSecure)
                 .path("/")
                 .maxAge(jwtService.getTtl())
-                .sameSite("Lax")
+                .sameSite(cookieSameSite)
                 .build();
 
         return ResponseEntity.ok()
@@ -47,11 +58,13 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Map<String, Boolean>> logout() {
+        // Must mirror the login cookie's attributes or the browser will not overwrite it.
         ResponseCookie cleared = ResponseCookie.from(JwtService.COOKIE_NAME, "")
                 .httpOnly(true)
+                .secure(cookieSecure)
                 .path("/")
                 .maxAge(0)
-                .sameSite("Lax")
+                .sameSite(cookieSameSite)
                 .build();
 
         return ResponseEntity.ok()
