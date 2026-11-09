@@ -1,21 +1,24 @@
--- Seed data. ON CONFLICT DO NOTHING keeps it idempotent; schema.sql drops and recreates every
--- table on startup, so a run always ends up with exactly this dataset.
+-- Seed data: the catalogue (services, extras) and the four house barbers with their schedules.
+-- Customers are not seeded: people register through POST /api/auth/register. More barbers come
+-- from the barber import (POST /api/barbers/import -> barber.created -> worker).
+--
+-- schema.sql no longer drops tables, so this runs against a live database on every start:
+-- every insert is ON CONFLICT DO NOTHING (or a targeted upsert), keeping it idempotent.
 --
 -- Key rule: each service has its OWN barbers — no barber is shared between two services.
 --   Classic Scissor Cut        -> Marcus + Elena
 --   Classic Beard Trim & Shape -> Leo + Viktor
---   Hot Towel Royal Shave      -> nobody (alternative flow 4A)
+--   Hot Towel Royal Shave      -> nobody (alternative flow 4A) until imported SENIOR beard
+--                                 barbers pick it up
 
 -- ───────────────────────────────────────────────
--- Customer
+-- Remove the old demo customer (alex) and everything hanging off it
 -- ───────────────────────────────────────────────
--- Demo login: alex / password  (bcrypt cost 10)
-INSERT INTO app_user (id, first_name, last_name, phone, email, date_of_birth, username, password_hash, role, loyalty_points) VALUES (
-  'a1b2c3d4-0001-0000-0000-000000000001',
-  'Alex', 'Mercer', '+48500123456', 'alex.mercer@email.com', '1994-08-14',
-  'alex', '$2a$10$12PcIvEP206ZrkBcmRvy6udOwYbnVLRSU4YwNQJG95sA4.EtC/MpS',
-  'CUSTOMER', 120
-) ON CONFLICT DO NOTHING;
+-- Earlier versions seeded a customer with fixed appointments and reviews. Children first.
+DELETE FROM review WHERE customer_id = 'a1b2c3d4-0001-0000-0000-000000000001';
+DELETE FROM appointment_extra WHERE appointment_id IN (SELECT id FROM appointment WHERE customer_id = 'a1b2c3d4-0001-0000-0000-000000000001');
+DELETE FROM appointment WHERE customer_id = 'a1b2c3d4-0001-0000-0000-000000000001';
+DELETE FROM app_user WHERE id = 'a1b2c3d4-0001-0000-0000-000000000001';
 
 -- ───────────────────────────────────────────────
 -- Barbers
@@ -91,29 +94,29 @@ INSERT INTO barber_service (id, barber_id, service_id, seniority, specialization
 --   Viktor 15:00–20:00  (late shift)
 --
 -- Marcus: MON–FRI mornings
-INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0001-0000-0000-000000000001', 'b1b2c3d4-0002-0000-0000-000000000002', 'MON', '09:00', '13:00', '2026-08-02', '2026-12-31', 1) ON CONFLICT DO NOTHING;
-INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0002-0000-0000-000000000002', 'b1b2c3d4-0002-0000-0000-000000000002', 'TUE', '09:00', '13:00', '2026-08-02', '2026-12-31', 1) ON CONFLICT DO NOTHING;
-INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0003-0000-0000-000000000003', 'b1b2c3d4-0002-0000-0000-000000000002', 'WED', '09:00', '13:00', '2026-08-02', '2026-12-31', 1) ON CONFLICT DO NOTHING;
-INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0004-0000-0000-000000000004', 'b1b2c3d4-0002-0000-0000-000000000002', 'THU', '09:00', '13:00', '2026-08-02', '2026-12-31', 1) ON CONFLICT DO NOTHING;
-INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0005-0000-0000-000000000005', 'b1b2c3d4-0002-0000-0000-000000000002', 'FRI', '09:00', '13:00', '2026-08-02', '2026-12-31', 1) ON CONFLICT DO NOTHING;
+INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0001-0000-0000-000000000001', 'b1b2c3d4-0002-0000-0000-000000000002', 'MON', '09:00', '13:00', '2026-01-01', '2030-12-31', 1) ON CONFLICT (id) DO UPDATE SET valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to;
+INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0002-0000-0000-000000000002', 'b1b2c3d4-0002-0000-0000-000000000002', 'TUE', '09:00', '13:00', '2026-01-01', '2030-12-31', 1) ON CONFLICT (id) DO UPDATE SET valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to;
+INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0003-0000-0000-000000000003', 'b1b2c3d4-0002-0000-0000-000000000002', 'WED', '09:00', '13:00', '2026-01-01', '2030-12-31', 1) ON CONFLICT (id) DO UPDATE SET valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to;
+INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0004-0000-0000-000000000004', 'b1b2c3d4-0002-0000-0000-000000000002', 'THU', '09:00', '13:00', '2026-01-01', '2030-12-31', 1) ON CONFLICT (id) DO UPDATE SET valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to;
+INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0005-0000-0000-000000000005', 'b1b2c3d4-0002-0000-0000-000000000002', 'FRI', '09:00', '13:00', '2026-01-01', '2030-12-31', 1) ON CONFLICT (id) DO UPDATE SET valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to;
 -- Elena: MON–FRI midday to evening
-INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0006-0000-0000-000000000006', 'c1b2c3d4-0003-0000-0000-000000000003', 'MON', '12:00', '18:00', '2026-08-02', '2026-12-31', 1) ON CONFLICT DO NOTHING;
-INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0007-0000-0000-000000000007', 'c1b2c3d4-0003-0000-0000-000000000003', 'TUE', '12:00', '18:00', '2026-08-02', '2026-12-31', 1) ON CONFLICT DO NOTHING;
-INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0008-0000-0000-000000000008', 'c1b2c3d4-0003-0000-0000-000000000003', 'WED', '12:00', '18:00', '2026-08-02', '2026-12-31', 1) ON CONFLICT DO NOTHING;
-INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0009-0000-0000-000000000009', 'c1b2c3d4-0003-0000-0000-000000000003', 'THU', '12:00', '18:00', '2026-08-02', '2026-12-31', 1) ON CONFLICT DO NOTHING;
-INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0010-0000-0000-000000000010', 'c1b2c3d4-0003-0000-0000-000000000003', 'FRI', '12:00', '18:00', '2026-08-02', '2026-12-31', 1) ON CONFLICT DO NOTHING;
+INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0006-0000-0000-000000000006', 'c1b2c3d4-0003-0000-0000-000000000003', 'MON', '12:00', '18:00', '2026-01-01', '2030-12-31', 1) ON CONFLICT (id) DO UPDATE SET valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to;
+INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0007-0000-0000-000000000007', 'c1b2c3d4-0003-0000-0000-000000000003', 'TUE', '12:00', '18:00', '2026-01-01', '2030-12-31', 1) ON CONFLICT (id) DO UPDATE SET valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to;
+INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0008-0000-0000-000000000008', 'c1b2c3d4-0003-0000-0000-000000000003', 'WED', '12:00', '18:00', '2026-01-01', '2030-12-31', 1) ON CONFLICT (id) DO UPDATE SET valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to;
+INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0009-0000-0000-000000000009', 'c1b2c3d4-0003-0000-0000-000000000003', 'THU', '12:00', '18:00', '2026-01-01', '2030-12-31', 1) ON CONFLICT (id) DO UPDATE SET valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to;
+INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0010-0000-0000-000000000010', 'c1b2c3d4-0003-0000-0000-000000000003', 'FRI', '12:00', '18:00', '2026-01-01', '2030-12-31', 1) ON CONFLICT (id) DO UPDATE SET valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to;
 -- Leo: MON–FRI full day
-INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0011-0000-0000-000000000011', 'd1b2c3d4-0004-0000-0000-000000000004', 'MON', '09:00', '17:00', '2026-08-02', '2026-12-31', 1) ON CONFLICT DO NOTHING;
-INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0012-0000-0000-000000000012', 'd1b2c3d4-0004-0000-0000-000000000004', 'TUE', '09:00', '17:00', '2026-08-02', '2026-12-31', 1) ON CONFLICT DO NOTHING;
-INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0013-0000-0000-000000000013', 'd1b2c3d4-0004-0000-0000-000000000004', 'WED', '09:00', '17:00', '2026-08-02', '2026-12-31', 1) ON CONFLICT DO NOTHING;
-INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0014-0000-0000-000000000014', 'd1b2c3d4-0004-0000-0000-000000000004', 'THU', '09:00', '17:00', '2026-08-02', '2026-12-31', 1) ON CONFLICT DO NOTHING;
-INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0015-0000-0000-000000000015', 'd1b2c3d4-0004-0000-0000-000000000004', 'FRI', '09:00', '17:00', '2026-08-02', '2026-12-31', 1) ON CONFLICT DO NOTHING;
+INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0011-0000-0000-000000000011', 'd1b2c3d4-0004-0000-0000-000000000004', 'MON', '09:00', '17:00', '2026-01-01', '2030-12-31', 1) ON CONFLICT (id) DO UPDATE SET valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to;
+INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0012-0000-0000-000000000012', 'd1b2c3d4-0004-0000-0000-000000000004', 'TUE', '09:00', '17:00', '2026-01-01', '2030-12-31', 1) ON CONFLICT (id) DO UPDATE SET valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to;
+INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0013-0000-0000-000000000013', 'd1b2c3d4-0004-0000-0000-000000000004', 'WED', '09:00', '17:00', '2026-01-01', '2030-12-31', 1) ON CONFLICT (id) DO UPDATE SET valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to;
+INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0014-0000-0000-000000000014', 'd1b2c3d4-0004-0000-0000-000000000004', 'THU', '09:00', '17:00', '2026-01-01', '2030-12-31', 1) ON CONFLICT (id) DO UPDATE SET valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to;
+INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0015-0000-0000-000000000015', 'd1b2c3d4-0004-0000-0000-000000000004', 'FRI', '09:00', '17:00', '2026-01-01', '2030-12-31', 1) ON CONFLICT (id) DO UPDATE SET valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to;
 -- Viktor: MON–FRI late shift
-INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0016-0000-0000-000000000016', 'e1b2c3d4-0005-0000-0000-000000000005', 'MON', '15:00', '20:00', '2026-08-02', '2026-12-31', 1) ON CONFLICT DO NOTHING;
-INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0017-0000-0000-000000000017', 'e1b2c3d4-0005-0000-0000-000000000005', 'TUE', '15:00', '20:00', '2026-08-02', '2026-12-31', 1) ON CONFLICT DO NOTHING;
-INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0018-0000-0000-000000000018', 'e1b2c3d4-0005-0000-0000-000000000005', 'WED', '15:00', '20:00', '2026-08-02', '2026-12-31', 1) ON CONFLICT DO NOTHING;
-INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0019-0000-0000-000000000019', 'e1b2c3d4-0005-0000-0000-000000000005', 'THU', '15:00', '20:00', '2026-08-02', '2026-12-31', 1) ON CONFLICT DO NOTHING;
-INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0020-0000-0000-000000000020', 'e1b2c3d4-0005-0000-0000-000000000005', 'FRI', '15:00', '20:00', '2026-08-02', '2026-12-31', 1) ON CONFLICT DO NOTHING;
+INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0016-0000-0000-000000000016', 'e1b2c3d4-0005-0000-0000-000000000005', 'MON', '15:00', '20:00', '2026-01-01', '2030-12-31', 1) ON CONFLICT (id) DO UPDATE SET valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to;
+INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0017-0000-0000-000000000017', 'e1b2c3d4-0005-0000-0000-000000000005', 'TUE', '15:00', '20:00', '2026-01-01', '2030-12-31', 1) ON CONFLICT (id) DO UPDATE SET valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to;
+INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0018-0000-0000-000000000018', 'e1b2c3d4-0005-0000-0000-000000000005', 'WED', '15:00', '20:00', '2026-01-01', '2030-12-31', 1) ON CONFLICT (id) DO UPDATE SET valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to;
+INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0019-0000-0000-000000000019', 'e1b2c3d4-0005-0000-0000-000000000005', 'THU', '15:00', '20:00', '2026-01-01', '2030-12-31', 1) ON CONFLICT (id) DO UPDATE SET valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to;
+INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_from, valid_to, is_active) VALUES ('bb000000-0020-0000-0000-000000000020', 'e1b2c3d4-0005-0000-0000-000000000005', 'FRI', '15:00', '20:00', '2026-01-01', '2030-12-31', 1) ON CONFLICT (id) DO UPDATE SET valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to;
 
 -- ───────────────────────────────────────────────
 -- Extra services
@@ -121,41 +124,3 @@ INSERT INTO schedule (id, barber_id, day_of_week, start_time, end_time, valid_fr
 INSERT INTO extra_service (id, type, name, price, description) VALUES ('cc000000-0001-0000-0000-000000000001', 'ALCOHOL', '12-Year Single Malt Scotch', 15, 'A premium pour of Glenfiddich 12-Year, served neat or on the rocks.') ON CONFLICT DO NOTHING;
 INSERT INTO extra_service (id, type, name, price, description) VALUES ('cc000000-0002-0000-0000-000000000002', 'CIGAR', 'Premium Cohiba Cuban Cigar', 20, 'Hand-rolled Cuban cigar, perfect for enjoying on the patio post-service.') ON CONFLICT DO NOTHING;
 INSERT INTO extra_service (id, type, name, price, description) VALUES ('cc000000-0003-0000-0000-000000000003', 'CARD_GAME', 'Quick Hand Blackjack Setup', 5, 'Pull up a chair at our lounge table for a quick dealer-hosted blackjack game.') ON CONFLICT DO NOTHING;
-
--- ───────────────────────────────────────────────
--- Appointments — anchored on 2026-08-02 (Sunday)
--- ───────────────────────────────────────────────
--- Every row uses a barber who really offers that service, at a time inside that barber's hours,
--- and no two appointments overlap for the customer.
---
--- The two future ones on 2026-08-03 make the "slots differ per barber" demo concrete: Marcus is
--- booked 09:00–09:30 and Elena 12:00–12:30 that day, so each loses a different slot from the
--- Classic Scissor Cut list.
---
--- PAST (before 2026-08-02):
--- Mon 2026-07-27 — Marcus, Classic Scissor Cut (09:00–13:00 shift). Reviewed, with the AAAA
--- promo applied: 35 base + 15 scotch = 50, less 20% = 40.
-INSERT INTO appointment (id, customer_id, barber_id, service_id, date, start_time, end_time, status, payment_status, payment_method, total_price, notes, cancellation_reason) VALUES ('dd000000-0001-0000-0000-000000000001', 'a1b2c3d4-0001-0000-0000-000000000001', 'b1b2c3d4-0002-0000-0000-000000000002', 'f1000000-0001-0000-0000-000000000001', '2026-07-27', '10:00', '10:30', 'COMPLETED', 'PAID', 'CARD', 40, NULL, NULL) ON CONFLICT DO NOTHING;
--- Thu 2026-07-30 — Viktor, Classic Beard Trim (15:00–20:00 late shift). No review, so the
--- "Write Review" flow is demonstrable.
-INSERT INTO appointment (id, customer_id, barber_id, service_id, date, start_time, end_time, status, payment_status, payment_method, total_price, notes, cancellation_reason) VALUES ('dd000000-0002-0000-0000-000000000002', 'a1b2c3d4-0001-0000-0000-000000000001', 'e1b2c3d4-0005-0000-0000-000000000005', 'f1000000-0004-0000-0000-000000000004', '2026-07-30', '16:00', '16:30', 'COMPLETED', 'PAID', 'CASH', 25, NULL, NULL) ON CONFLICT DO NOTHING;
--- Wed 2026-07-29 — Leo, Classic Beard Trim (09:00–17:00 full day). Reviewed; different barber.
-INSERT INTO appointment (id, customer_id, barber_id, service_id, date, start_time, end_time, status, payment_status, payment_method, total_price, notes, cancellation_reason) VALUES ('dd000000-0007-0000-0000-000000000007', 'a1b2c3d4-0001-0000-0000-000000000001', 'd1b2c3d4-0004-0000-0000-000000000004', 'f1000000-0004-0000-0000-000000000004', '2026-07-29', '10:00', '10:30', 'COMPLETED', 'PAID', 'MOBILE', 25, NULL, NULL) ON CONFLICT DO NOTHING;
--- Tue 2026-07-28 — Elena, Classic Scissor Cut (12:00–18:00 shift). Cancelled.
-INSERT INTO appointment (id, customer_id, barber_id, service_id, date, start_time, end_time, status, payment_status, payment_method, total_price, notes, cancellation_reason) VALUES ('dd000000-0005-0000-0000-000000000005', 'a1b2c3d4-0001-0000-0000-000000000001', 'c1b2c3d4-0003-0000-0000-000000000003', 'f1000000-0001-0000-0000-000000000001', '2026-07-28', '13:00', '13:30', 'CANCELLED', 'UNPAID', 'CASH', 35, NULL, 'Schedule conflict on my end') ON CONFLICT DO NOTHING;
-
--- FUTURE (after 2026-08-02):
--- Mon 2026-08-03 — Marcus, Classic Scissor Cut (09:00–13:00 shift), with a cigar extra.
-INSERT INTO appointment (id, customer_id, barber_id, service_id, date, start_time, end_time, status, payment_status, payment_method, total_price, notes, cancellation_reason) VALUES ('dd000000-0003-0000-0000-000000000003', 'a1b2c3d4-0001-0000-0000-000000000001', 'b1b2c3d4-0002-0000-0000-000000000002', 'f1000000-0001-0000-0000-000000000001', '2026-08-03', '09:00', '09:30', 'CONFIRMED', 'UNPAID', 'MOBILE', 55, NULL, NULL) ON CONFLICT DO NOTHING;
--- Mon 2026-08-03 — Elena, Classic Scissor Cut (12:00–18:00 shift), same day, different barber.
-INSERT INTO appointment (id, customer_id, barber_id, service_id, date, start_time, end_time, status, payment_status, payment_method, total_price, notes, cancellation_reason) VALUES ('dd000000-0004-0000-0000-000000000004', 'a1b2c3d4-0001-0000-0000-000000000001', 'c1b2c3d4-0003-0000-0000-000000000003', 'f1000000-0001-0000-0000-000000000001', '2026-08-03', '12:00', '12:30', 'CONFIRMED', 'UNPAID', 'CASH', 35, NULL, NULL) ON CONFLICT DO NOTHING;
--- Wed 2026-08-05 — Viktor, Classic Beard Trim (15:00–20:00 late shift).
-INSERT INTO appointment (id, customer_id, barber_id, service_id, date, start_time, end_time, status, payment_status, payment_method, total_price, notes, cancellation_reason) VALUES ('dd000000-0008-0000-0000-000000000008', 'a1b2c3d4-0001-0000-0000-000000000001', 'e1b2c3d4-0005-0000-0000-000000000005', 'f1000000-0004-0000-0000-000000000004', '2026-08-05', '15:30', '16:00', 'NEW', 'UNPAID', 'CASH', 25, NULL, NULL) ON CONFLICT DO NOTHING;
-
--- Extra services linked to appointments
-INSERT INTO appointment_extra (appointment_id, extra_service_id) VALUES ('dd000000-0001-0000-0000-000000000001', 'cc000000-0001-0000-0000-000000000001') ON CONFLICT DO NOTHING;
-INSERT INTO appointment_extra (appointment_id, extra_service_id) VALUES ('dd000000-0003-0000-0000-000000000003', 'cc000000-0002-0000-0000-000000000002') ON CONFLICT DO NOTHING;
-
--- Reviews — two of the three completed appointments, different barbers
-INSERT INTO review (id, appointment_id, customer_id, rating, comment, date) VALUES ('ee000000-0001-0000-0000-000000000001', 'dd000000-0001-0000-0000-000000000001', 'a1b2c3d4-0001-0000-0000-000000000001', 5, 'Marcus nailed the scissor cut and the scotch was a great touch. The promo made it a steal.', '2026-07-27') ON CONFLICT DO NOTHING;
-INSERT INTO review (id, appointment_id, customer_id, rating, comment, date) VALUES ('ee000000-0002-0000-0000-000000000002', 'dd000000-0007-0000-0000-000000000007', 'a1b2c3d4-0001-0000-0000-000000000001', 4, 'Leo was quick and precise with the beard line-up. Clean finish, would book again.', '2026-07-29') ON CONFLICT DO NOTHING;

@@ -40,7 +40,8 @@ public class User {
     @Column(name = "email")
     private String email;
 
-    @Column(nullable = false)
+    /** Null for self-registered customers, who are not asked for it. */
+    @Column
     private String dateOfBirth;
 
     @Column(name = "username", unique = true)
@@ -119,6 +120,31 @@ public class User {
     private List<Review> writtenReviews = new ArrayList<>();
 
     protected User() {
+    }
+
+    /** Creates a self-registered customer. The password must already be hashed. */
+    public static User customer(
+            String id,
+            String firstName,
+            String lastName,
+            String phone,
+            String email,
+            String username,
+            String passwordHash
+    ) {
+        User user = new User();
+        user.id = id;
+        user.firstName = firstName;
+        user.lastName = lastName;
+        user.phone = phone;
+        user.email = email;
+        user.username = username;
+        user.passwordHash = passwordHash;
+        user.role = UserRole.CUSTOMER;
+        user.loyaltyPoints = 0;
+        user.managementAccess = false;
+        user.canMentor = false;
+        return user;
     }
 
     /** Creates a barber. Used by the worker when consuming a BarberCreatedEvent. */
