@@ -49,6 +49,30 @@ beardbuddy:
     # Override in every real deployment: docker-compose and k8s both pass this in.
     secret: ${BEARDBUDDY_JWT_SECRET:local-dev-secret-change-me-please-32-bytes-min}
     ttl-minutes: ${BEARDBUDDY_JWT_TTL_MINUTES:120}
+  cookie:
+    # Frontend and API on different hosts (cloud): SameSite=None + Secure=true, or the browser
+    # drops the auth cookie and every call after login is a 401. Same host (compose): Lax/false.
+    same-site: ${BEARDBUDDY_COOKIE_SAME_SITE:Lax}
+    secure: ${BEARDBUDDY_COOKIE_SECURE:false}
+  password:
+    # BCrypt cost factor (log2 rounds), 4..31. Each +1 doubles the hashing time; 10-12 is typical.
+    bcrypt-rounds: ${BEARDBUDDY_BCRYPT_ROUNDS:10}
+  barber-import:
+    # How many barbers one click of "Import barbers" creates.
+    batch-size: ${BEARDBUDDY_IMPORT_BATCH_SIZE:10}
+    # Upper bound for the custom /api/barbers/load endpoint.
+    max-batch-size: ${BEARDBUDDY_IMPORT_MAX_BATCH_SIZE:200}
+    # Minimum time between two imports by the same user.
+    cooldown-seconds: ${BEARDBUDDY_IMPORT_COOLDOWN_SECONDS:300}
+  rate-limit:
+    # Fixed one-minute windows, counted in memory per API instance.
+    # Login/register, per client IP: slows down password guessing and signup spam.
+    auth-per-minute: ${BEARDBUDDY_RATE_LIMIT_AUTH_PER_MINUTE:10}
+    # Everything else, per signed-in user (or per IP when anonymous).
+    api-per-minute: ${BEARDBUDDY_RATE_LIMIT_API_PER_MINUTE:120}
+    # Reverse proxies in front of the API that append to X-Forwarded-For (Railway's edge = 1).
+    # 0 = ignore the header and use the socket address.
+    trusted-proxies: ${BEARDBUDDY_RATE_LIMIT_TRUSTED_PROXIES:1}
   schedule:
     # How far ahead the worker materialises schedules.
     horizon-days: ${BEARDBUDDY_SCHEDULE_HORIZON_DAYS:365}

@@ -6,6 +6,8 @@ public record LoadBarbersResponse(
         String topic,
         String validFrom,
         String validTo,
-        long tookMs
+        long tookMs,
+        /** ISO-8601 instant from which the same user may import again. */
+        String nextImportAt
 ) {
 }

@@ -9,6 +9,10 @@ data:
   BEARDBUDDY_CORS_ORIGINS: http://localhost:3000
   BEARDBUDDY_KAFKA_BARBER_TOPIC: barber.created
   BEARDBUDDY_SCHEDULE_HORIZON_DAYS: "365"
+  BEARDBUDDY_BCRYPT_ROUNDS: "10"
+  # Load-test friendly: allow 5000-barber batches back to back.
+  BEARDBUDDY_IMPORT_MAX_BATCH_SIZE: "5000"
+  BEARDBUDDY_IMPORT_COOLDOWN_SECONDS: "0"
 ---
 apiVersion: v1
 kind: Secret

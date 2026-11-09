@@ -4,16 +4,18 @@ import com.beardbuddy.application.AuthService;
 import com.beardbuddy.config.JwtService;
 import com.beardbuddy.web.dto.CustomerDto;
 import com.beardbuddy.web.dto.LoginRequest;
+import com.beardbuddy.web.dto.RegisterRequest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Duration;
 import java.util.Map;
 
 @RestController
@@ -22,6 +24,8 @@ public class AuthController {
 
     private final AuthService authService;
     private final JwtService jwtService;
+    private final String cookieSameSite;
+    private final boolean cookieSecure;
 
     // Cross-site by default in the cloud: the browser app and the API sit on different
     // hosts, and a Lax cookie is dropped on those requests. Configurable so a same-origin
@@ -35,11 +39,15 @@ public class AuthController {
     public AuthController(AuthService authService, JwtService jwtService) {
         this.authService = authService;
         this.jwtService = jwtService;
+        this.cookieSameSite = cookieSameSite;
+        this.cookieSecure = cookieSecure;
     }
 
     @PostMapping("/login")
     public ResponseEntity<CustomerDto> login(@RequestBody LoginRequest request) {
         String token = authService.login(request.username(), request.password());
+        return withSession(ResponseEntity.ok(), token);
+    }
 
         // httpOnly so JavaScript cannot read it. SameSite/Secure come from config because
         // SameSite=None is only honoured on a Secure cookie, and Secure needs https.
@@ -68,11 +76,25 @@ public class AuthController {
                 .build();
 
         return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, cleared.toString())
+                .header(HttpHeaders.SET_COOKIE, cookie("", Duration.ZERO).toString())
                 .body(Map.of("ok", true));
     }
 
-    private String subjectOf(String token) {
-        return jwtService.verify(token).orElseThrow().getSubject();
+    private ResponseEntity<CustomerDto> withSession(ResponseEntity.BodyBuilder response, String token) {
+        String userId = jwtService.verify(token).orElseThrow().getSubject();
+        return response
+                .header(HttpHeaders.SET_COOKIE, cookie(token, jwtService.getTtl()).toString())
+                .body(authService.currentUser(userId));
+    }
+
+    /** httpOnly so JavaScript cannot read it. Logout must use the same attributes to overwrite it. */
+    private ResponseCookie cookie(String value, Duration maxAge) {
+        return ResponseCookie.from(JwtService.COOKIE_NAME, value)
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .path("/")
+                .maxAge(maxAge)
+                .sameSite(cookieSameSite)
+                .build();
     }
 }

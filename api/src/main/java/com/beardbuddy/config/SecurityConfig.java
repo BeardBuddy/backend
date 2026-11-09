@@ -29,7 +29,16 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtAuthFilter) throws Exception {
+    public SecurityFilterChain filterChain(
+            HttpSecurity http,
+            JwtAuthFilter jwtAuthFilter,
+            @Value("${beardbuddy.rate-limit.auth-per-minute}") int authPerMinute,
+            @Value("${beardbuddy.rate-limit.api-per-minute}") int apiPerMinute,
+            @Value("${beardbuddy.rate-limit.trusted-proxies}") int trustedProxies
+    ) throws Exception {
+        // After the JWT filter, so authenticated calls are counted per user rather than per IP.
+        RateLimitFilter rateLimitFilter = new RateLimitFilter(authPerMinute, apiPerMinute, trustedProxies);
+
         return http
                 // Stateless JWT in an httpOnly cookie: no server session, so no CSRF token store.
                 .csrf(csrf -> csrf.disable())
@@ -41,12 +50,17 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 
+    /** Cost factor comes from BEARDBUDDY_BCRYPT_ROUNDS; existing hashes keep working at any value. */
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+    public PasswordEncoder passwordEncoder(@Value("${beardbuddy.password.bcrypt-rounds}") int rounds) {
+        if (rounds < 4 || rounds > 31) {
+            throw new IllegalStateException("BEARDBUDDY_BCRYPT_ROUNDS must be between 4 and 31, got " + rounds);
+        }
+        return new BCryptPasswordEncoder(rounds);
     }
 
     @Bean

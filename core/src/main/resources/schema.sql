@@ -5,28 +5,18 @@
 -- This script owns the schema; Hibernate's ddl-auto is 'none' so the CHECK constraints survive
 -- (Hibernate would not generate them).
 --
--- Every table is dropped and recreated on each startup, so a run always ends up with exactly the
--- seed in data.sql regardless of what the previous run left behind. That makes startup idempotent
--- and immune to a stale beardbuddy.db from an older schema.
+-- Non-destructive: tables are created only when missing, so registered users, imported barbers
+-- and their appointments survive restarts and redeploys. Changes to an existing table go at the
+-- bottom as idempotent ALTERs.
 --
--- Children before parents: foreign keys are enforced.
-DROP TABLE IF EXISTS review CASCADE;
-DROP TABLE IF EXISTS appointment_extra CASCADE;
-DROP TABLE IF EXISTS appointment CASCADE;
-DROP TABLE IF EXISTS service_sub_service CASCADE;
-DROP TABLE IF EXISTS barber_service CASCADE;
-DROP TABLE IF EXISTS schedule CASCADE;
-DROP TABLE IF EXISTS extra_service CASCADE;
-DROP TABLE IF EXISTS service CASCADE;
-DROP TABLE IF EXISTS app_user CASCADE;
-
+-- Children after parents: foreign keys are enforced.
 CREATE TABLE IF NOT EXISTS app_user (
   id                  TEXT PRIMARY KEY,
   first_name           TEXT NOT NULL,
   last_name            TEXT NOT NULL,
   phone               TEXT NOT NULL,
   email               TEXT,
-  date_of_birth         TEXT NOT NULL,
+  date_of_birth         TEXT,
   username            TEXT UNIQUE,
   password_hash        TEXT,
   role                TEXT NOT NULL CHECK(role IN ('CUSTOMER','BARBER')),
@@ -133,3 +123,11 @@ CREATE TABLE IF NOT EXISTS review (
   comment        TEXT,
   date           TEXT NOT NULL
 );
+
+-- ───────────────────────────────────────────────
+-- Idempotent upgrades for databases created by an older version of this file
+-- ───────────────────────────────────────────────
+-- Registered customers are not asked for a date of birth.
+ALTER TABLE app_user ALTER COLUMN date_of_birth DROP NOT NULL;
+-- When this user last ran a barber import; drives the per-user cooldown.
+ALTER TABLE app_user ADD COLUMN IF NOT EXISTS last_barber_import_at TIMESTAMPTZ;

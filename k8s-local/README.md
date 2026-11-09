@@ -43,13 +43,14 @@ the `wait-for-api` initContainer doing its job, not a failure.
 
 ## 3. Verify
 
-Everything except `/api/auth/**` requires a session, so log in first and keep the
-cookie. The token comes back as an httpOnly cookie, not in the body.
+Everything except `/api/auth/**` requires a session, so register (which also signs
+you in) and keep the cookie. The token comes back as an httpOnly cookie, not in the body.
+No customer is seeded.
 
 ```sh
-curl -s -c /tmp/bb.jar -X POST localhost:30080/api/auth/login \
+curl -s -c /tmp/bb.jar -X POST localhost:30080/api/auth/register \
   -H 'Content-Type: application/json' \
-  -d '{"username":"alex","password":"password"}'
+  -d '{"username":"demo","password":"demo-pass-123","firstName":"Demo","lastName":"User","phone":"+48500123456"}'
 
 curl -s -b /tmp/bb.jar localhost:30080/api/services
 curl -s -b /tmp/bb.jar \
@@ -57,11 +58,15 @@ curl -s -b /tmp/bb.jar \
 ```
 
 Expect 3 services, and Marcus + Elena on the first one. In the browser:
-`http://localhost:30300`, log in as **alex / password**.
+`http://localhost:30300`, create an account on the sign-in screen.
 
-Kafka pipeline end to end. The endpoint returns **202 Accepted** as soon as the
-events are published — the worker materialises schedules afterwards, so the row
-count climbs for a few seconds after the curl returns:
+Kafka pipeline end to end. The **Import barbers** button on the dashboard calls
+`POST /api/barbers/import` (10 barbers, varied shifts). For a bulk load use
+`/api/barbers/load`. Both return **202 Accepted** as soon as the events are
+published — the worker writes barbers, their service links and schedules
+afterwards, so the row count climbs for a few seconds after the curl returns.
+`k8s/config.yaml` lifts the batch cap and the per-user cooldown so this can be
+re-run; in production they default to 200 barbers and 5 minutes.
 
 ```sh
 curl -s -b /tmp/bb.jar -X POST localhost:30080/api/barbers/load \

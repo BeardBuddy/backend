@@ -67,6 +67,18 @@ public class BarberService {
     protected BarberService() {
     }
 
+    /** Links a barber to a service they offer. Used by the worker for imported barbers. */
+    public static BarberService of(String id, User barber, Service service) {
+        BarberService link = new BarberService();
+        link.id = id;
+        link.barber = barber;
+        link.service = service;
+        link.seniority = barber.getSeniorityLevel();
+        link.specializationType = barber.getSpecializationType();
+        link.yearsOfExperience = barber.getExperienceYears();
+        return link;
+    }
+
     public String getId() {
         return id;
     }
